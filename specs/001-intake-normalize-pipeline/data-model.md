@@ -5,16 +5,31 @@ All entities are plain files under `HYPPO_DATA_DIR`. Types live in `src/domain/t
 
 ---
 
+## SettingsStore  *(input — read-only)*
+
+`inputs/settings.json`, produced and validated by feature 002 (schema:
+`specs/002-onboarding-settings/contracts/settings-store.md`). Feature 001 reads:
+
+| Path | Used for |
+|---|---|
+| `completeness.setupReady` | run precondition (FR-000) — false ⇒ report unresolved sections, exit |
+| `sections.trackedBoards.value[]` | the `TrackedSource` list |
+| `sections.hardStops.value` | `TriageCriteria` hard stops |
+| `sections.locations.value.excluded` | unioned into effective excluded locations |
+| `sections.directions.value[]` | `ConsideredDirection` list |
+
+---
+
 ## TrackedSource  *(input — read-only)*
 
-Parsed from `inputs/boards.md`. One per bullet.
+One entry of `sections.trackedBoards.value[]` in the settings store.
 
 | Field | Type | Notes |
 |---|---|---|
-| `name` | string | Display name; defaults to the search URL's host if not given |
+| `name` | string | Display name; defaults to the search URL's host if absent |
 | `filteredSearch` | string | User-authored filtered board search — a tuned search URL (and/or native params). Opaque to HyppoGraph (R3, R5). |
 | `depth` | integer ≥ 1 | Collection depth — how many results to walk within the filtered set |
-| `configError` | string \| null | Set when the bullet couldn't be parsed / has no filtered search (FR-002a); source is then skipped |
+| `configError` | string \| null | Set when `filteredSearch` is empty or `depth` is non-positive (FR-002a); source is then skipped and reported in `RunSummary.sourcesFailed` |
 
 ---
 
@@ -121,27 +136,31 @@ CanonicalCompany. Never modified by this feature.
 
 ## ConsideredDirection  *(input — read-only)*
 
-One file in `inputs/directions/`. Coarse "does this posting relate to anything I want?" reference for
-pre-triage (FR-008b).
+One entry of `sections.directions.value[]` in the settings store. Coarse "does this posting relate to
+anything I want?" reference for pre-triage (FR-008b).
 
-| Field | Type |
-|---|---|
-| `name` | string (file title / first heading) |
-| `context` | string (file body) |
+| Field | Type | Notes |
+|---|---|---|
+| `name` | string | Unique within the list |
+| `description` | string | What roles this direction covers — the text the triage judgment matches against |
+
+(`materialsPath` exists on the store entry but is not read by this feature.)
 
 ---
 
 ## HardStops  *(input — read-only)*
 
-Parsed from `inputs/priorities.md` (R5).
+`sections.hardStops.value` in the settings store.
 
 | Field | Type | Notes |
 |---|---|---|
-| `excludedLocations` | string[] | Triage rejects a posting whose only location(s) fall here |
+| `excludedLocations` | string[] | Effective set = this ∪ `sections.locations.value.excluded`. Triage rejects a posting whose only location(s) fall here |
 | `lackedClearances` | string[] | Triage rejects a posting requiring one of these |
 | `lackedWorkAuth` | string[] | Triage rejects a posting requiring work authorisation the user lacks |
+| `visaSponsorshipRequired` | boolean | When true, triage rejects a posting that offers no sponsorship |
 
-Empty / absent ⇒ no hard stops (FR-008d).
+All arrays empty + `visaSponsorshipRequired` false ⇒ no hard stops; with `directions` also empty,
+FR-008d applies.
 
 ---
 

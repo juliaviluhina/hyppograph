@@ -87,8 +87,13 @@ first three `rejected` with reasons, last two `kept`; only kept records reach no
 low-confidence fixture is `kept` and counted in `triageLowConfidence`.
 
 ### 5. No triage criteria — FR-008d
-Fixture data dir with empty `directions/` and no `## Hard stops`. Assert: every raw record `kept`,
+Fixture `settings.json` with `hardStops` all-empty (+ `visaSponsorshipRequired: false`) and
+`directions: []` (a hand-edited store past onboarding's validation). Assert: every raw record `kept`,
 `RunSummary.noTriageCriteria === true`.
+
+### 5a. Setup not ready — FR-000, SC-011
+Fixture `settings.json` with `completeness.setupReady: false`. Assert: the run prints
+`completeness.unresolved` and exits with zero writes to the data directory.
 
 ### 6. Normalize produces the full fixed field set — US2 AS-1..5, SC-004, SC-005
 `tests/integration/normalize.spec.ts`: kept raw records from three fixture boards, faked `judge()`.
@@ -116,7 +121,7 @@ names; no test double ever receives a submit/send/apply call. `tests/unit/allowe
 
 ## Manual end-to-end (real HyppoVisor)
 
-1. Point `HYPPO_DATA_DIR` at a real data dir with a small `boards.md` (one board, `depth: 5`).
+1. Point `HYPPO_DATA_DIR` at a real data dir whose `inputs/settings.json` has `completeness.setupReady: true` and one tracked board at `depth: 5` (run feature 002's onboarding, or hand-write it).
 2. `npm run pipeline`.
 3. Confirm `outputs/job-records/raw/` has ≤ 5 files, `outputs/job-records/` has the normalized
    records, `provenance-log.md` grew, and `outputs/last-run-summary.md` matches what you saw on stdout.

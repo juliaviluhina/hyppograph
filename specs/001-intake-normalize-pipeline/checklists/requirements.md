@@ -50,3 +50,10 @@
   repo-root `.mcp.json`; Principle I / V guardrails and read-only-inputs clause
   folded into tasks T010/T011/T041; SC-006a / SC-007 percentage targets marked
   spot-checked in Phase A, measured in Phase B.
+- Config source consolidated (2026-08-31): tracked boards, hard stops, and
+  considered directions now come from the structured settings store
+  `inputs/settings.json` (schema owned by feature 002), not hand-authored
+  `boards.md` / `priorities.md` / `directions/`. New FR-000 (setup-ready
+  precondition) + SC-011; `contracts/inputs-format.md`, `research.md` R5,
+  `data-model.md`, `plan.md`, and tasks T002/T006/T010/T012/T026/T027 updated.
+  `applications.md` and the manual-postings drop stay hand-authored.

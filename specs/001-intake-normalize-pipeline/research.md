@@ -128,23 +128,34 @@ surfacing it. One retry is cheap at fast tier.
 
 ---
 
-## R5. Input file formats (`boards.md`, `priorities.md`, `directions/`)
+## R5. Configuration source — the settings store
 
-**Decision**: Parse tolerantly; document the expected shape in `contracts/inputs-format.md`:
-- `boards.md` — a Markdown list, one bullet per tracked source: a link (the filtered search URL) plus
-  an inline `depth: N` (and optional `name:`). Lines that don't parse are reported as
-  configuration errors for that source (FR-002a), not fatal.
-- `priorities.md` — hard stops read from a delimited section (e.g. a `## Hard stops` heading) with
-  recognised keys for excluded locations and lacked clearances / work authorisations. Absent section ⇒
-  no hard stops (FR-008d).
-- `directions/` — one Markdown file per considered direction; the file's title/first heading is the
-  direction name, body is context for the triage judgment. Empty directory ⇒ no directions (FR-008d).
+**Decision**: Read configuration from the structured settings store `inputs/settings.json` (schema
+owned by feature 002, `specs/002-onboarding-settings/contracts/settings-store.md`), not from
+hand-authored Markdown. Feature 001 consumes three sections:
+- `trackedBoards[]` → `{ name, filteredSearch, depth }` per source (was `boards.md`). An entry with an
+  empty `filteredSearch` or non-positive `depth` is a per-source configuration error (FR-002a).
+- `hardStops` → `{ excludedLocations, lackedClearances, lackedWorkAuth, visaSponsorshipRequired }`
+  (was the `## Hard stops` block in `priorities.md`). Effective excluded locations = `hardStops.excludedLocations ∪ locations.excluded`.
+- `directions[]` → `{ name, description }` for the pre-triage judgment (was `directions/*.md`);
+  `materialsPath` is ignored here.
 
-**Rationale**: These are user-hand-authored files (per the README's `inputs/` tree). Tolerant parsing
-with explicit "couldn't read this" reporting beats a rigid schema the user must satisfy exactly.
+At run start the store is loaded and its `completeness.setupReady` checked; a missing store or
+`setupReady === false` stops the run before any collection (FR-000), with the unresolved required
+sections named. `applications.md` and the `manual-postings/` drop remain hand-authored files parsed
+by 001 (see `contracts/inputs-format.md`).
 
-**Alternatives considered**: Require YAML/JSON inputs — rejected: contradicts the README's "plain md /
-CSV" and the privacy-friendly "a folder you point at" model.
+**Rationale**: One structured source of truth, one parser, no tolerant-Markdown ambiguity — and it
+removes the deferred "migrate 001's parser" task the feature-002 clarification would otherwise create.
+Feature 002's onboarding validates the store, so 001 can assume well-formed sections when
+`setupReady` is true. The store lives under `HYPPO_DATA_DIR` as a plain file the user controls, so the
+privacy / "a folder you point at" model is preserved.
+
+**Alternatives considered**:
+- *Keep tolerant Markdown parsing of `boards.md` / `priorities.md` / `directions/`* — rejected: two
+  sources of truth once feature 002 exists, fuzzy parsing, and a migration task later.
+- *001 reads the regenerated Markdown views feature 002 emits* — rejected: same fuzziness, and makes a
+  human-inspection convenience a correctness dependency.
 
 ---
 
@@ -153,9 +164,9 @@ CSV" and the privacy-friendly "a folder you point at" model.
 **Decision**:
 - **Raw Record identity** = canonical source URL (board postings) or absolute file path (manual drop).
   `store/rawRecord.ts` skips a fetch/write when that identity already exists (FR-008).
-- **Triage mark** is stored on/next to the Raw Record; re-running with unchanged `priorities.md` +
-  `directions/` leaves an existing mark untouched (a content hash of the triage criteria + raw text is
-  stored with the mark; recompute only on mismatch).
+- **Triage mark** is stored on/next to the Raw Record; re-running with an unchanged `hardStops` +
+  `directions` view of `settings.json` leaves an existing mark untouched (a content hash of the triage
+  criteria + raw text is stored with the mark; recompute only on mismatch).
 - **Job Record identity** = deterministic key `{canonical company, normalized role title, overlapping
   location set}` (FR-015); a re-seen posting merges its source reference into the existing file.
 - Tests inject fixture-backed `mcp/` and `model/` fakes so a full run is reproducible and the

@@ -1,69 +1,58 @@
-# Contract: Input files read by this feature
+# Contract: Inputs read by this feature
 
-All under `HYPPO_DATA_DIR`, hand-authored by the user, **read-only** here. Parsing is tolerant:
-anything unparseable is reported (per source / per file) and the run continues.
+All under `HYPPO_DATA_DIR`, **read-only** here.
 
----
-
-## `inputs/boards.md` → `TrackedSource[]`
-
-A Markdown bullet list. One bullet per tracked source. Recognised shapes:
-
-```markdown
-## Boards
-
-- [Senior TS roles, EU remote](https://www.linkedin.com/jobs/search/?keywords=typescript&f_WT=2&...) — depth: 40
-- name: Wellfound backend  <https://wellfound.com/jobs?...>  depth: 25
-- https://boards.greenhouse.io/acme?...   depth: 15
-```
-
-| Element | Rule |
-|---|---|
-| filtered search URL | The bullet's link (Markdown link, autolink, or bare URL). Required. Missing ⇒ `configError`, source skipped (FR-002a). |
-| `depth: N` | Integer ≥ 1. Missing ⇒ default depth (`HYPPO_DEFAULT_DEPTH`, default 25). |
-| `name:` | Optional display name. Missing ⇒ URL host. |
-
-Headings and non-bullet lines are ignored.
+- **Configuration** (tracked boards, hard stops, considered directions) comes from the structured
+  settings store `inputs/settings.json` — schema owned by feature 002, at
+  `specs/002-onboarding-settings/contracts/settings-store.md`. Feature 001 assumes it is well-formed
+  when `completeness.setupReady` is true (feature 002's onboarding validates it on write).
+- **`inputs/applications.md`** and the **`inputs/manual-postings/`** drop remain hand-authored files,
+  parsed tolerantly by this feature.
 
 ---
 
-## `inputs/priorities.md` → `HardStops`
+## `inputs/settings.json` — run precondition (FR-000)
 
-Hard stops are read from a delimited section. Recognised:
+At run start:
+1. Load `inputs/settings.json`. Missing / unreadable ⇒ report "settings not found — run onboarding
+   (feature 002)" and exit with zero writes.
+2. If `completeness.setupReady !== true` ⇒ print `completeness.unresolved` (each `{ section, reason }`)
+   and exit with zero writes.
+3. Otherwise proceed, reading the sections below.
 
-```markdown
-## Hard stops
+## `inputs/settings.json` → `TrackedSource[]`
 
-- Excluded locations: US-only, India
-- No clearance: TS/SCI, Public Trust
-- No work authorization: requires US citizenship, needs existing EU work permit
-```
+From `sections.trackedBoards.value[]`. Each entry:
 
-| Key (case-insensitive, `:`-delimited list) | Maps to |
+| Field | Rule |
 |---|---|
-| `Excluded locations` | `excludedLocations[]` |
-| `No clearance` / `Clearances I lack` | `lackedClearances[]` |
-| `No work authorization` / `Work auth I lack` | `lackedWorkAuth[]` |
+| `filteredSearch` | Non-empty string — the tuned board search URL / params, used opaquely. Empty ⇒ `configError`, source skipped (FR-002a). |
+| `depth` | Integer ≥ 1. Non-positive or missing ⇒ `configError`, source skipped. |
+| `name` | Display name; falls back to the `filteredSearch` host. |
 
-No `## Hard stops` section (or all lists empty) ⇒ no hard stops; pre-triage keeps everything and the
-run summary sets `noTriageCriteria` if directions are also absent (FR-008d). The rest of
-`priorities.md` (scoring weights, salary benchmarks) is **not** read by this feature.
+## `inputs/settings.json` → `HardStops`
 
----
+From `sections.hardStops.value`: `{ excludedLocations[], lackedClearances[], lackedWorkAuth[],
+visaSponsorshipRequired }`. Effective excluded locations = `excludedLocations ∪
+sections.locations.value.excluded`. All arrays empty and `visaSponsorshipRequired` false ⇒ no hard
+stops (with `directions` also empty, FR-008d applies).
 
-## `inputs/directions/` → `ConsideredDirection[]`
+## `inputs/settings.json` → `ConsideredDirection[]`
 
-One Markdown file per direction. Empty directory / no files ⇒ no directions (FR-008d).
-
-| Field | Source |
-|---|---|
-| `name` | The file's first `#` heading, else the filename without extension |
-| `context` | The remaining file body — passed to the pre-triage judgment as the description of what this direction covers |
+From `sections.directions.value[]`. Each: `{ name, description }` — `description` is the text the
+pre-triage judgment matches a posting against. `materialsPath` is present on the entry but ignored
+here.
 
 ---
 
 ## `inputs/applications.md` → `ApplicationsTrackerEntry[]`
 
-Existing applications tracker. Parsed for `{ company, role, ref }` rows (Markdown table or bullet list;
-tolerant). Used only for `alreadyApplied` linking (FR-016) and to seed `CanonicalCompany`. Never
-written.
+Hand-authored applications tracker. Parsed tolerantly for `{ company, role, ref }` rows (Markdown
+table or bullet list). Used only for `alreadyApplied` linking (FR-016) and to seed `CanonicalCompany`.
+Never written.
+
+## `inputs/manual-postings/` → Raw Records
+
+Hand-authored drop folder. Each file = one posting to ingest with `retrievalMethod: "manual"` and
+`sourceRef` = the file path. A file that isn't a job posting is skipped with a run-summary note
+(FR-003, spec edge case).

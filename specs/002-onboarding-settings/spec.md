@@ -12,7 +12,7 @@
 
 ### Session 2026-08-31
 
-- Q: How do the onboarding settings hand off to the input files feature 001 already reads (`boards.md`, `priorities.md` hard stops, `directions/`)? → A: A structured settings store is the single source of truth; onboarding also regenerates the human-readable Markdown views so feature 001 works unchanged now, and feature 001's input parsing is later updated (a follow-up task on that feature) to read the structured store directly. The Markdown files become a generated, inspectable view — not a second source of truth and not hand-edited once onboarding owns the section.
+- Q: How do the onboarding settings hand off to the input files feature 001 already reads? → A: A structured settings store (`inputs/settings.json`, `contracts/settings-store.md`) is the single source of truth. **Feature 001 reads that store directly** (its `trackedBoards`, `hardStops`, `directions` sections) — resolved 2026-08-31, 001's spec/plan/tasks updated. Onboarding MAY additionally emit human-readable Markdown renderings of the store for the user to inspect, but no consumer parses them; they are not a source of truth and not hand-edited for sections onboarding owns.
 - Q: Which sections are required for "setup ready" vs optional with a default? → A: Required = locations, eligibility hard stops, considered directions, tracked boards. Optional (built-in default, skippable) = work arrangement, compensation, scoring-weight notes, collection tuning (pacing / fetch cap / default depth).
 - Q: What does the "candidate basics" section capture? → A: A small optional section — display name/handle for deliverables plus an optional contact line — and a non-blocking check that `candidate-profile.md` exists. The profile prose stays hand-authored and is not owned by onboarding.
 
@@ -129,9 +129,9 @@ the output names that exact section, marks setup "incomplete", and that a downst
 - **FR-001a**: The candidate basics section MUST capture only a display name/handle for deliverables and an optional contact line, and MUST perform a non-blocking check that `candidate-profile.md` exists in the data directory (reported as advisory, never blocking `setup ready`). Onboarding MUST NOT own or rewrite the candidate profile prose.
 - **FR-002**: For every question, the system MUST display a concrete default proposal and let the user accept it unchanged or replace it.
 - **FR-003**: The system MUST mark each section as one of `unset`, `answered`, or `skipped`, and MUST allow `skipped` only for sections declared optional.
-- **FR-004**: The system MUST persist answers to a settings store located under the user-configured data directory.
+- **FR-004**: The system MUST persist answers to the settings store `inputs/settings.json` under the user-configured data directory, in the shape defined by `contracts/settings-store.md`.
 - **FR-005**: The settings store MUST be machine-readable in a structured form the pipeline and the model can consume directly, and it is the single source of truth for the configuration it owns.
-- **FR-005a**: On every save, the system MUST regenerate the human-readable Markdown views that feature 001 consumes (a board list, a hard-stops note, a directions folder) from the settings store, so those files stay a faithful rendering of the store and are not hand-edited for sections onboarding owns.
+- **FR-005a**: The system MAY additionally emit human-readable Markdown renderings of the settings store for the user to inspect; when it does, they MUST be regenerated from the store on save and MUST NOT be treated as an input by any consumer. They are optional and never a source of truth.
 - **FR-006**: The system MUST validate each answer against its type and constraints (e.g. compensation floor is a number with a currency; each tracked board has a non-empty search reference and a positive depth) and MUST reject an invalid answer with a specific reason without storing it.
 - **FR-007**: On a run where a settings store already exists, the system MUST show the current value of every section and offer to change one section, change all, or leave everything unchanged.
 - **FR-008**: When the user edits a section, the system MUST pre-fill that section's questions with the current stored values as the defaults, and MUST write only the edited section(s) on save — all other sections MUST remain byte-identical.
@@ -153,8 +153,8 @@ the output names that exact section, marks setup "incomplete", and that a downst
 
 ### Key Entities *(include if feature involves data)*
 
-- **Settings Store**: The canonical, structured record of all configuration, under the data directory. Read by onboarding, the pipeline, and the model. Has a schema/shape the completeness check validates against.
-- **Settings Rendering**: A human-readable view of the Settings Store the user can read and sanity-check (kept in sync with the store, not a second source of truth).
+- **Settings Store**: `inputs/settings.json` — the canonical, structured record of all configuration. Shape and section list in `contracts/settings-store.md`. Read by onboarding, feature 001, later pipeline steps, and the model. Its `completeness` block is validated on every write.
+- **Settings Rendering** *(optional)*: A human-readable Markdown view of the Settings Store the user can read and sanity-check. Regenerated from the store; never an input; not a source of truth.
 - **Setting Section**: One named group of related settings (locations, compensation, tracked boards, …) with a status (`unset` / `answered` / `skipped`), a `required` flag, and its values.
 - **Question**: One prompt within a section, with a default proposal, a type/constraint, and a `required` flag.
 - **Candidate Basics**: Optional. A display name/handle used on deliverables and an optional contact line. Plus an advisory flag for whether `candidate-profile.md` exists. Does not hold profile prose.
@@ -181,7 +181,8 @@ the output names that exact section, marks setup "incomplete", and that a downst
 - **SC-008**: An invalid answer (wrong type, empty required list, malformed board search) is rejected before storage in 100% of the tested cases, with a message naming the offending field.
 - **SC-009**: Zero outward-facing actions occur during any onboarding run.
 - **SC-010**: After first-run setup completes, the intake/normalize pipeline runs to completion using only the stored settings, with no additional configuration questions asked of the user.
-- **SC-011**: After any save, the regenerated Markdown views parse cleanly under feature 001's existing input rules and represent 100% of the corresponding store entries.
+- **SC-011**: The settings store written by onboarding validates against `contracts/settings-store.md` — every section key present with a valid `status`, and `completeness.setupReady` true iff every required section is `answered` — in 100% of test cases.
+- **SC-012**: When a Markdown rendering is emitted, it represents 100% of the corresponding store entries (it is a view, not a filtered subset).
 
 ## Assumptions
 
@@ -191,15 +192,17 @@ the output names that exact section, marks setup "incomplete", and that a downst
 - **Ownership boundaries**: The candidate profile prose, the merged connections store, and the applications tracker remain separate hand-authored files (per the project README's `inputs/` tree). Onboarding may read the connections/applications files for context but does not own or rewrite them; it *does* own the locations / work-arrangement / compensation / eligibility / directions / boards configuration.
 - **Single user**: Only the job seeker runs this; no multi-user or role model.
 - **Required vs optional sections**: Required (setup is not "ready" until all are `answered`) — locations, eligibility hard stops, considered directions, tracked boards. Optional (a built-in default applies and the section may be `skipped`) — candidate basics, work arrangement, compensation, free-text scoring-weight notes, and collection-tuning overrides (pacing, fetch cap, default depth).
-- **Downstream consumers**: The structured settings store is the single source of truth for the configuration onboarding owns (locations, work arrangement, compensation, eligibility hard stops, considered directions, tracked boards). Onboarding regenerates the Markdown views feature 001 currently reads (`boards.md`, `priorities.md` hard stops, `directions/`) from the store on every save, so 001 keeps working with no change; a follow-up task on feature 001 updates its input parsing to read the structured store directly, after which the Markdown files remain only an inspectable rendering.
+- **Downstream consumers**: The structured settings store (`inputs/settings.json`, shape in `contracts/settings-store.md`) is the single source of truth for the configuration onboarding owns (candidate basics, locations, work arrangement, compensation, eligibility hard stops, considered directions, tracked boards, collection tuning, scoring-weight notes). Feature 001 reads its `trackedBoards`, `hardStops`, and `directions` sections and its `completeness.setupReady` flag directly from this store — no Markdown intermediary.
 - **Defaults source**: Built-in default proposals are sensible starting points (e.g. work arrangement = "remote or hybrid", excluded locations = none, collection depth = 25, pacing = conservative); they are not personalised guesses about the user.
 
 ## Dependencies
 
-- **Feature 001 (intake & normalize)** is the primary consumer of the sections onboarding owns. It
-  currently reads hand-authored Markdown; onboarding regenerates that Markdown from the store
-  (FR-005a) so 001 is unaffected on delivery. A follow-up task on feature 001 — tracked there, not
-  here — switches its parsing to the structured store.
+- **Feature 001 (intake & normalize)** is the primary consumer: it reads `inputs/settings.json` —
+  the `trackedBoards`, `hardStops`, and `directions` sections plus `completeness.setupReady` —
+  directly, per the shared schema `contracts/settings-store.md`. There is no Markdown intermediary
+  and no follow-up parser-migration task on 001.
+- The **shared schema** `contracts/settings-store.md` is owned by this feature; feature 001 references
+  it. Changes to it are coordinated across both.
 - The **data directory** (`HYPPO_DATA_DIR`) and its layout are shared with feature 001 and HyppoVisor;
-  onboarding adds the settings store and its rendered views, and reads the connections / applications
-  files for context only.
+  onboarding adds the settings store (and, optionally, a human-readable rendering), and reads the
+  candidate-profile / connections / applications files for context only.

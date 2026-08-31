@@ -10,6 +10,10 @@
 
 ## Clarifications
 
+### Session 2026-08-31
+
+- Q: Where do the tracked boards, hard stops, and considered directions come from? → A: From the structured settings store `inputs/settings.json` (schema owned by feature 002, `specs/002-onboarding-settings/contracts/settings-store.md`) — sections `trackedBoards`, `hardStops`, `directions`. This replaces the hand-authored `boards.md`, `priorities.md` hard-stops block, and `directions/*.md` parsing. `applications.md` and the manual-postings drop remain hand-authored files. If `settings.json` is missing or `completeness.setupReady` is false, intake reports the unresolved required sections and exits without collecting.
+
 ### Session 2026-08-30
 
 - Q: How should the system decide a re-seen role is the same Job Record and update it? → A: Deterministic key = canonical company + normalized role title + overlapping location set; new hits merge new source references into the existing record in place.
@@ -31,10 +35,10 @@ non-starters. The output is structured data plus a provenance trail.
 
 ### User Story 1 - Collect raw job postings from tracked sources (Priority: P1)
 
-The user has listed the job boards they care about in their inputs — each as a
-pre-tuned board search (its own keyword / location / date / seniority filters) plus
-how deep to look — and may also drop in individual postings they found themselves.
-When HyppoGraph runs, it opens each tracked source's filtered search through the
+The job boards the user cares about — each a pre-tuned board search (its own keyword /
+location / date / seniority filters) plus how deep to look — are recorded in the
+settings store by the onboarding stage; the user may also drop in individual postings
+they found themselves. When HyppoGraph runs, it opens each tracked source's filtered search through the
 page-read provider, walks the filtered result set to the configured depth, retrieves
 the full text of every posting it finds, and stores each one verbatim together with
 where it came from, when it was seen, and how it was retrieved. Nothing relevant is
@@ -162,16 +166,18 @@ elsewhere in the user's data.
 - A tracked source's filtered search is stale or rejected by the board (e.g. the board changed its URL scheme): the source is recorded as failed in the run summary and provenance log, and the run continues with the other sources.
 - A tracked source's filtered search returns zero postings: recorded as zero for that source, no error, run continues.
 - Pre-triage rejects every posting in a run: normalization does nothing, the run summary reports zero kept and lists the reject reasons so the user can tell their hard stops or directions are too tight.
-- The user's inputs do not state any hard stops or any considered directions: pre-triage keeps every Raw Record and the run summary notes that no triage criteria were configured.
+- `settings.json` is missing, unreadable, or `completeness.setupReady` is false: intake reports the unresolved required sections and exits before collecting anything — no partial run (FR-000). The user is pointed at the onboarding stage (feature 002).
+- Hard stops are all empty and `directions` is empty: pre-triage keeps every Raw Record and the run summary notes that no triage criteria were configured (this can only occur if `settings.json` was hand-edited past onboarding's validation, since `directions` is a required non-empty section).
 - A posting is rejected by pre-triage but the user later widens their directions or hard stops: the rejected Raw Record is still in the archive and can be re-triaged on a later run (re-triage of stored records is in scope; re-fetching the posting is not).
 
 ## Requirements *(mandatory)*
 
 ### Functional Requirements
 
-- **FR-001**: The system MUST read, at the start of each intake run, the user's tracked-source list from the inputs directory, where each tracked board source carries a user-authored filtered board search (a tuned search URL and/or the board's native filter parameters) and a collection depth.
+- **FR-000**: At the start of a run the system MUST load the settings store `inputs/settings.json` (per `specs/002-onboarding-settings/contracts/settings-store.md`). If the store is absent or its `completeness.setupReady` is false, the system MUST report every unresolved required section and exit without collecting, storing, or normalising anything.
+- **FR-001**: The system MUST read the tracked-board list from the `trackedBoards` section of the settings store — each entry a `{ name, filteredSearch, depth }`, where `filteredSearch` is the user-authored tuned board search (search URL and/or native filter parameters) and `depth` is a positive integer collection depth.
 - **FR-002**: The system MUST retrieve job postings from each tracked board source through the external page-read provider by opening that source's filtered board search and walking its result set, up to the configured collection depth per source.
-- **FR-002a**: The system MUST apply board-native filters upstream — by navigating the user-authored filtered search — and MUST NOT browse a board unfiltered and discard postings afterward. If a source has no filtered search defined, the system MUST record it as a configuration error for that source and skip it.
+- **FR-002a**: The system MUST apply board-native filters upstream — by navigating the user-authored filtered search — and MUST NOT browse a board unfiltered and discard postings afterward. If a `trackedBoards` entry has an empty `filteredSearch` or a non-positive `depth`, the system MUST record it as a configuration error for that source and skip it.
 - **FR-002b**: The system MUST NOT withhold any posting retrieved from a filtered result set from raw storage; relevance narrowing at intake happens only through the board-native filter, not by dropping fetched postings.
 - **FR-003**: The system MUST ingest job postings that the user has placed in a designated manual-input location, in addition to tracked-board postings.
 - **FR-004**: The system MUST store every collected posting as a raw record that preserves the original posting text unchanged.
@@ -181,9 +187,9 @@ elsewhere in the user's data.
 - **FR-007**: The system MUST append one provenance-log entry per stored raw record, per pre-triage mark (kept or rejected, with reason), and per created or updated Job Record, stating what was added or decided, how, and why.
 - **FR-008**: Intake, pre-triage, and normalize runs MUST be idempotent: re-running with no new input MUST NOT create duplicate raw records, duplicate triage marks, or duplicate Job Records.
 - **FR-008a**: Before normalization, the system MUST assign each Raw Record a pre-triage mark of "kept" or "rejected" via a single lightweight relevance judgment per record, and MUST record a one-line reason for every "rejected" mark.
-- **FR-008b**: Pre-triage MUST mark a Raw Record "rejected" when the posting trips a user-defined hard stop — a location the user's inputs exclude, or a security clearance or work authorization the user's inputs state they do not hold — or when the posting shows no plausible overlap with any of the user's considered career directions.
+- **FR-008b**: Pre-triage MUST mark a Raw Record "rejected" when the posting trips a hard stop from the settings store's `hardStops` section — a location in `excludedLocations` (unioned with `locations.excluded`), a clearance in `lackedClearances`, a work authorization in `lackedWorkAuth`, or (when `visaSponsorshipRequired` is true) a posting that offers no sponsorship — or when the posting shows no plausible overlap with any entry in the settings store's `directions` section (matched on each direction's `name` + `description`).
 - **FR-008c**: Pre-triage MUST mark a Raw Record "kept" whenever it trips no hard stop and plausibly overlaps at least one considered direction, and MUST default to "kept" (flagging it in the run summary) when it cannot classify the record confidently. Pre-triage MUST NOT delete or alter any Raw Record.
-- **FR-008d**: When the user's inputs define no hard stops and no considered directions, pre-triage MUST mark every Raw Record "kept" and the run summary MUST note that no triage criteria were configured.
+- **FR-008d**: When the effective hard stops are all empty (no excluded locations, clearances, or lacked work authorizations, and `visaSponsorshipRequired` false), pre-triage evaluates direction overlap only; if `directions` is also empty, pre-triage MUST mark every Raw Record "kept" and the run summary MUST note that no triage criteria were configured.
 - **FR-008e**: Normalization MUST process only Raw Records marked "kept". "Rejected" Raw Records MUST remain in the archive with their reason and MUST be eligible for re-triage on a later run if the user's hard stops or directions change.
 - **FR-009**: The system MUST convert each raw record into a Job Record exposing a fixed field set: role title, canonical company name, location(s), work arrangement, salary amount/range, salary currency, seniority, employment type, responsibilities summary, requirements list, posting date, and source reference(s).
 - **FR-009a**: The system MUST store each Job Record as a single Markdown file whose structured front-matter block carries the full fixed field set (each field present or explicitly "unknown") and whose body holds the human-readable summary. Each linked Raw Record MUST be a separate sibling file referenced from the Job Record.
@@ -201,11 +207,12 @@ elsewhere in the user's data.
 
 ### Key Entities *(include if feature involves data)*
 
-- **Tracked Source**: A job board the user wants monitored, defined by a user-authored filtered board search (tuned search URL and/or native filter parameters) plus a collection depth. Lives in the inputs directory.
-- **Manual Posting Drop**: A location in the inputs/data directory where the user places individual postings for ingestion.
+- **Settings Store**: `inputs/settings.json`, the structured configuration owned by feature 002 (`settings-store.md`). Feature 001 reads three sections of it — `trackedBoards`, `hardStops`, `directions` — and its `completeness.setupReady` flag. Read-only here.
+- **Tracked Source**: One entry in the settings store's `trackedBoards` section — `{ name, filteredSearch, depth }`. `filteredSearch` is a user-authored tuned board search; HyppoGraph treats it opaquely.
+- **Manual Posting Drop**: A designated folder (`inputs/manual-postings/`) where the user places individual postings for ingestion. Hand-authored, not part of the settings store.
 - **Raw Record**: One collected posting stored verbatim, with source name, source reference, first-seen timestamp, retrieval method, originating run, and a pre-triage mark ("kept" or "rejected" plus a one-line reason, set before normalization). The verbatim text is immutable once written; the triage mark may be recomputed on a later run.
-- **Triage Criteria**: The user-supplied inputs pre-triage judges against — hard stops (excluded locations; clearances / work authorizations the user does not hold, from `priorities.md`) and the list of considered career directions (from `inputs/directions/`). Read-only for this feature.
-- **Considered Direction**: One career direction the user is pursuing, already prepared in the inputs directory; used as the coarse "does this posting plausibly relate to anything I want?" reference for pre-triage.
+- **Triage Criteria**: What pre-triage judges against — the settings store's `hardStops` section (excluded locations, lacked clearances, lacked work authorizations, visa-sponsorship-required flag) and its `directions` section. Read-only for this feature.
+- **Considered Direction**: One entry in the settings store's `directions` section — `{ name, description }` (the `materialsPath` pointer to per-direction CV material is ignored here). The coarse "does this posting plausibly relate to anything I want?" reference for pre-triage.
 - **Job Record**: The normalized, comparable representation of one role — fixed field set (title, canonical company, locations, arrangement, salary + currency, seniority, employment type, responsibilities summary, requirements list, posting date), a completeness flag, original language, links to one or more Raw Records, and an optional link to an applications-tracker entry. Identified by the deterministic key {canonical company, normalized role title, overlapping location set}; re-seen postings matching that key update it in place. Consumed by every later pipeline step.
 - **Canonical Company**: The single agreed name and identity for a company that multiple postings and applications may reference under varying spellings.
 - **Applications Tracker Entry**: An existing record of a role the user has already applied to; used as a dedup and "already-applied" reference, not modified here.
@@ -229,17 +236,29 @@ elsewhere in the user's data.
 - **SC-008**: Every captured posting whose company and role match an applications-tracker entry is linked to it and marked already-applied (100% of the known-match test set).
 - **SC-009**: A run that collects 100 postings completes end-to-end — collection, pre-triage of all 100, and normalization of the kept subset — within 30 minutes (configured pacing delays included), without manual intervention, and produces a summary with all required counts.
 - **SC-010**: Zero outward-facing actions (messages, applications, connection requests) occur during intake, pre-triage, or normalize.
+- **SC-011**: When `settings.json` is missing or `completeness.setupReady` is false, the run makes zero writes to the data directory and its output names every unresolved required section.
+
+## Dependencies
+
+- **Feature 002 (onboarding & settings stage)** produces `inputs/settings.json`. This feature reads its
+  `trackedBoards`, `hardStops`, and `directions` sections and its `completeness.setupReady` flag. A
+  real run requires setup to be complete; fixtures include a hand-written `settings.json`. Schema:
+  `specs/002-onboarding-settings/contracts/settings-store.md`.
+- **HyppoVisor** — page reads / navigation only, via the MCP contract (`contracts/hyppovisor-page-read.md`).
+- **The data directory** (`HYPPO_DATA_DIR`) — shared with feature 002 and HyppoVisor. This feature adds
+  `outputs/job-records/**` and appends `provenance-log.md`; it reads `settings.json`, `applications.md`,
+  and the `manual-postings/` drop.
 
 ## Assumptions
 
-- **Sources**: The job seeker maintains the tracked-boards list in the inputs directory (per the project README's `inputs/boards.md`). Each entry is a pre-tuned filtered board search — a search URL and/or the board's native filter settings, authored by the user — plus a collection depth. HyppoGraph passes the filter through; it does not synthesise or infer board filters. Board postings are retrieved via the HyppoVisor MCP page-read contract; HyppoGraph has no authenticated session of its own.
-- **Board filter capabilities vary**: Each board supports a different set of native filters. The user is responsible for authoring a working filtered search per board; HyppoGraph treats it opaquely as "the URL/params to open".
-- **Pre-triage criteria**: Hard stops (excluded locations, clearances / work authorizations the user lacks) come from `priorities.md`; considered directions come from `inputs/directions/`. Both are read-only here. Pre-triage is a coarse, high-recall keep/reject gate, not a fit assessment.
+- **Sources**: The tracked-boards list comes from the settings store's `trackedBoards` section (`inputs/settings.json`), produced by the onboarding stage (feature 002). Each entry is a user-authored filtered board search plus a collection depth. HyppoGraph passes the filter through opaquely; it does not synthesise or infer board filters. Board postings are retrieved via the HyppoVisor MCP page-read contract; HyppoGraph has no authenticated session of its own.
+- **Board filter capabilities vary**: Each board supports a different set of native filters. The user authors a working filtered search per board (via onboarding); HyppoGraph treats it opaquely as "the URL/params to open".
+- **Pre-triage criteria**: Hard stops and considered directions come from the settings store's `hardStops` and `directions` sections. Both are read-only here. Pre-triage is a coarse, high-recall keep/reject gate, not a fit assessment.
 - **Manual input**: A designated location in the data directory lets the user add individual postings by hand; these are treated as first-class inputs with retrieval method "manual".
 - **Trigger**: Intake and normalize run when the orchestrating code invokes them (an explicit run), not on a continuous background schedule. Scheduling, if any, is external.
 - **One-time capture**: A posting is captured once. Detecting and re-syncing changes to an already-captured posting is out of scope for this version.
 - **Dedup key**: Job Record identity is the deterministic key {canonical company, normalized role title, overlapping location set} (FR-015); postings not matching an existing key produce a distinct record. Separately, an identical canonical source URL identifies the same Raw Record and is used for intake idempotency (FR-008).
-- **Applications tracker & connections store** already exist in the inputs directory and are read-only for this feature.
+- **Applications tracker & connections store** are hand-authored files that already exist in the inputs directory (not part of the settings store) and are read-only for this feature.
 - **Output location**: Raw Records and Job Records are written under `outputs/job-records/` in the user-configured data directory. A Job Record is one Markdown file (structured front-matter + readable body); each Raw Record is a sibling file it links to. The provenance log is the append-only `provenance-log.md` at the data-directory root.
 - **Scope boundary**: This feature covers collection, coarse keep/reject pre-triage, and normalization. Full hard-filtering with fit and gap analysis, scoring, warm-path enrichment, tiering, and deliverables are explicitly downstream and out of scope. Pre-triage here only removes obvious non-starters so normalization budget is not wasted; it does not rank or score.
 - **Language**: Source postings may be in any language; Job Record fields are normalized to English for downstream comparison.

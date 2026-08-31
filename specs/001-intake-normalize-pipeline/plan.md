@@ -39,8 +39,14 @@ directory (inputs *and* outputs) lives entirely outside this repository; how it 
 backed up, retained, or pruned is the user's decision. In-repo `tests/fixtures/data-dir/` is synthetic
 test data only.
 
-**External dependency**: HyppoVisor, reached only through its documented MCP page-read surface
-(`contracts/hyppovisor-page-read.md`). HyppoGraph holds no authenticated session and has no UI.
+**External dependencies**:
+- **HyppoVisor**, reached only through its documented MCP page-read surface
+  (`contracts/hyppovisor-page-read.md`). HyppoGraph holds no authenticated session and has no UI.
+- **Feature 002 (onboarding & settings stage)** produces `HYPPO_DATA_DIR/inputs/settings.json`. This
+  feature reads its `trackedBoards`, `hardStops`, and `directions` sections and checks
+  `completeness.setupReady` before doing anything (FR-000). Schema:
+  `specs/002-onboarding-settings/contracts/settings-store.md`. `applications.md` and the
+  `manual-postings/` drop remain hand-authored files.
 
 **Model tiers**: Only the **fast** tier (Haiku-class) is used by this feature — for pre-triage,
 extraction/normalisation, dedup grouping, and company-name matching, per the constitution's model
@@ -55,8 +61,8 @@ per source; per-run fetch cap configurable.
   read/navigation tools are ever allow-listed.
 - Orchestration control flow is code (a workflow script in Phase A, plain TS in Phase B), never a
   model choosing the next step.
-- All writes land under `HYPPO_DATA_DIR`; personal inputs (`priorities.md`, `directions/`) are
-  read-only and never copied into the repo, logs, or telemetry.
+- All writes land under `HYPPO_DATA_DIR`; inputs (`settings.json`, `applications.md`,
+  `manual-postings/`) are read-only and never copied into the repo, logs, or telemetry.
 - Re-runs are idempotent (SC-006): unchanged input ⇒ no new Raw Records, no changed triage marks, no
   new Job Records. Anchored on persisted identity keys + a triage-criteria hash, not on identical
   model output.
@@ -176,7 +182,7 @@ src/
 ├── model/judge.ts           # single entry to query(): { tier, systemPrompt, input, schema } → validated object
 ├── mcp/hyppovisor.ts        # adapter over the HyppoVisor page-read contract
 └── store/                   # the ONLY writer, all paths rooted at HYPPO_DATA_DIR
-    ├── dataDir.ts  boards.ts  priorities.ts  directions.ts  applications.ts
+    ├── dataDir.ts  settings.ts (reads inputs/settings.json + setupReady gate)  applications.ts
     ├── rawRecord.ts  jobRecord.ts  provenance.ts
 
 tests/
@@ -197,7 +203,7 @@ Phase B realises them as modules + `query()`. Porting A→B is re-housing known 
 | Substrate | `.claude/workflows/intake-normalize.js` + Claude Code session | B1: SDK `Workflow` tool wrapping the same script · B2: plain TS on `@anthropic-ai/claude-agent-sdk` |
 | Tests | Manual, quickstart scenarios by hand | `vitest` unit + integration, SC-006 re-run assertion, CI |
 | Billing | Plan / subscription (Claude Code session) | API key |
-| Exit criteria | Quickstart scenarios 1–9 pass by hand against fixtures; one real run against a small live `boards.md` produces correct Job Records + provenance + summary; SC-007/SC-008 spot-checked | All quickstart scenarios automated and green; SC-006 idempotency test passes; `judge()` + `mcp/` behind interfaces with fixture fakes |
+| Exit criteria | Quickstart scenarios 1–9 pass by hand against fixtures; one real run against a small live `settings.json` produces correct Job Records + provenance + summary; the `setupReady: false` precondition exit works; SC-007/SC-008 spot-checked | All quickstart scenarios automated and green; SC-006 idempotency test passes; `judge()` + `mcp/` behind interfaces with fixture fakes |
 | Carried over A→B | Spec, data model, all `contracts/`, the JSON schemas used in `agent()` calls, prompt text, fixtures, the step decomposition | — |
 | Decision point | After Phase A, choose B1 (keep script, thin harness) or B2 (full rewrite) based on whether the sandbox limits (`import`, clock, 16-agent cap, no CI) actually bite | — |
 

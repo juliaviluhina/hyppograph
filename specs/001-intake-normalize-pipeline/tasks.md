@@ -27,9 +27,16 @@ coverage is Phase B).
 
 - Workflow script: `.claude/workflows/intake-normalize.js` (repo root)
 - Project MCP config: `.mcp.json` (repo root) — Claude Code project scope
-- Fixtures: `tests/fixtures/data-dir/` (synthetic), `tests/fixtures/live/` (one small real board list)
-- Contract docs: `specs/001-intake-normalize-pipeline/contracts/`
+- Fixtures: `tests/fixtures/data-dir/` (synthetic, incl. a hand-written `inputs/settings.json`), `tests/fixtures/live/` (a small real `settings.json`)
+- Contract docs: `specs/001-intake-normalize-pipeline/contracts/`; settings-store schema: `specs/002-onboarding-settings/contracts/settings-store.md`
 - Runtime data: the user-configured `HYPPO_DATA_DIR`, entirely outside this repo
+
+## Dependency
+
+Configuration (tracked boards, hard stops, considered directions) is read from
+`HYPPO_DATA_DIR/inputs/settings.json`, produced by **feature 002 (onboarding & settings stage)**. A
+real run needs `completeness.setupReady: true`; fixtures supply a hand-written store. `applications.md`
+and the `manual-postings/` drop remain hand-authored files.
 
 ---
 
@@ -38,11 +45,11 @@ coverage is Phase B).
 **Purpose**: Skeleton workflow, fixtures, and session configuration
 
 - [ ] T001 Create `.claude/workflows/intake-normalize.js` skeleton: `export const meta` first (`name: "intake-normalize"`, `description`, `phases: ["collect","triage","normalize"]`), empty body that reads `args.runTimestamp` and `args.dataDir` and `log()`s them (the workflow clock is frozen — all timestamps come from `args`)
-- [ ] T002 [P] Create fixture inputs tree under `tests/fixtures/data-dir/inputs/`: `boards.md` (2 filtered-search bullets with `depth:` + 1 deliberately unparseable line), `priorities.md` (a `## Hard stops` section with excluded locations and a lacked clearance), `directions/` (2 direction files), `applications.md` (1 entry that will match a fixture posting), `manual-postings/` (1 real posting `.md` + 1 non-posting file)
+- [ ] T002 [P] Create fixture inputs tree under `tests/fixtures/data-dir/inputs/`: a hand-written `settings.json` (per `specs/002-onboarding-settings/contracts/settings-store.md`) with `completeness.setupReady: true`, `trackedBoards` = 2 valid entries + 1 with an empty `filteredSearch`, `hardStops` = excluded locations + a lacked clearance, `directions` = 2 entries; `applications.md` (1 entry that will match a fixture posting); `manual-postings/` (1 real posting `.md` + 1 non-posting file). Also a second fixture `settings.json` with `completeness.setupReady: false` for the precondition test.
 - [ ] T003 [P] Create fixture pre-made Raw Records under `tests/fixtures/data-dir/outputs/job-records/raw/` (front-matter `id/sourceName/sourceRef/firstSeenAt/retrievalMethod/run/availability` + verbatim body, `triage: null`), one per scenario: excluded-location, lacked-clearance, no-direction-overlap, two plausible matches, one deliberately ambiguous, no-salary/no-location, non-English, "see our careers site", same-role-from-two-boards (x2), `Acme` / `Acme Inc.` company variants, same-title-different-location
 - [ ] T004 [P] Create `.mcp.json` at the repo root (Claude Code project scope) configuring the `hyppovisor` MCP server (`type: "http"`, `url`/`Authorization` via `${ENV}` expansion — no literal tokens) and record in `specs/001-intake-normalize-pipeline/contracts/hyppovisor-page-read.md` the exact read/navigation tool names to allow-list once confirmed against HyppoVisor's published contract
 - [ ] T005 [P] Create `.env.example` at repo root with `HYPPO_DATA_DIR`, `HYPPO_VISOR_MCP_URL`, `HYPPO_VISOR_MCP_TOKEN`, `HYPPO_MODEL_FAST`, `HYPPO_PACING_MS`, `HYPPO_FETCH_CAP`, `HYPPO_DEFAULT_DEPTH`
-- [ ] T006 [P] Create `tests/fixtures/live/boards.md` with one real filtered board search at `depth: 5` for the live collect check; add a short README note that the real `HYPPO_DATA_DIR` is never in this repo
+- [ ] T006 [P] Create `tests/fixtures/live/settings.json` with `setupReady: true` and one real filtered board search at `depth: 5` for the live collect check; add a short README note that the real `HYPPO_DATA_DIR` is never in this repo
 
 ---
 
@@ -55,8 +62,8 @@ coverage is Phase B).
 - [ ] T007 In `.claude/workflows/intake-normalize.js`, define the four `agent()` JSON schemas as top-level `const`s: `collectResultSchema` (posting refs), `triageMarkSchema` (decision/reason/confidence), `jobRecordFieldsSchema` (the fixed field set, every key required, `"unknown"` allowed), `dedupGroupSchema` (canonical company + key)
 - [ ] T008 [P] Write `specs/001-intake-normalize-pipeline/contracts/schemas.md` documenting those four schemas and which `agent()` call uses each
 - [ ] T009 In the script, implement inline helpers: `provenanceLine(entry)` formatted per `contracts/outputs-format.md`, and a `RunSummary` accumulator object matching data-model.md (`postingsCollected`, `newRawRecords`, `triageKept/Rejected`, `triageRejectReasons`, `triageLowConfidence`, `newJobRecords`, `duplicatesMerged`, `sourcesFailed`, `itemsSkipped`, `noTriageCriteria`)
-- [ ] T010 In the script body, implement the code-only orchestrator: `phase("collect")` → `phase("triage")` → `phase("normalize")` calling stage functions in that fixed order, threading `args.runTimestamp` as the run id and `args.dataDir` as the root, then `log()` the assembled `RunSummary`. The script alone sequences phases and stages — no `agent()` result may redirect control flow (Principle I).
-- [ ] T011 In the script, define a shared subagent policy applied on every `agent()` call: (a) **tools** — collect subagents get only `["mcp__hyppovisor__<read>", "Write"]`, triage and normalize subagents get only `["Read", "Write"]`; no subagent gets `Edit`, `Bash`, or any submit/send capability (Principle IV). (b) **scope** — each `agent()` prompt is one bounded action (fetch this posting; classify this record; extract this posting) with no discretion over pipeline flow (Principle I). (c) **paths** — every write is `args.dataDir` + a relative path; `inputs/` files (`boards.md`, `priorities.md`, `directions/`, `applications.md`, `manual-postings/`) are opened read-only and never copied outside `args.dataDir` (Principle V, FR-019).
+- [ ] T010 In the script body, implement the code-only orchestrator: first load `${args.dataDir}/inputs/settings.json` — if it is missing/unreadable or `completeness.setupReady !== true`, `log()` `completeness.unresolved` and exit with zero writes (FR-000); otherwise `phase("collect")` → `phase("triage")` → `phase("normalize")` in that fixed order, threading `args.runTimestamp` as the run id and `args.dataDir` as the root, then `log()` the assembled `RunSummary`. The script alone sequences phases and stages — no `agent()` result may redirect control flow (Principle I).
+- [ ] T011 In the script, define a shared subagent policy applied on every `agent()` call: (a) **tools** — collect subagents get only `["mcp__hyppovisor__<read>", "Write"]`, triage and normalize subagents get only `["Read", "Write"]`; no subagent gets `Edit`, `Bash`, or any submit/send capability (Principle IV). (b) **scope** — each `agent()` prompt is one bounded action (fetch this posting; classify this record; extract this posting) with no discretion over pipeline flow (Principle I). (c) **paths** — every write is `args.dataDir` + a relative path; `inputs/` (`settings.json`, `applications.md`, `manual-postings/`) is opened read-only and never copied outside `args.dataDir` (Principle V, FR-019).
 
 **Checkpoint**: Skeleton runs end-to-end as a no-op with all three phases and prints an empty summary
 
@@ -67,19 +74,19 @@ coverage is Phase B).
 **Goal**: Walk each tracked source's filtered search via HyppoVisor, store every retrieved posting
 verbatim with provenance, plus ingest the manual drop.
 
-**Independent Test**: Point `HYPPO_DATA_DIR` at a dir with a small real `boards.md` + the fixture
+**Independent Test**: Point `HYPPO_DATA_DIR` at a dir with a small real `settings.json` (`setupReady: true`) + the fixture
 `manual-postings/`, run the workflow; confirm each posting from the filtered result sets is a Raw
 Record with `sourceRef` + `firstSeenAt` + `retrievalMethod`, one provenance line each, and manual
 postings marked `retrievalMethod: "manual"`.
 
-- [ ] T012 [US1] In the `collect` stage: parse `${args.dataDir}/inputs/boards.md` into sources (bullet link = filtered search, inline `depth:` else `HYPPO_DEFAULT_DEPTH`, optional `name:`); an unparseable bullet becomes `configError` and the source is skipped and reported (FR-001, FR-002a) — per `contracts/inputs-format.md`
+- [ ] T012 [US1] In the `collect` stage: read `sections.trackedBoards.value[]` from `settings.json` into sources (`{ name, filteredSearch, depth }`); an entry with an empty `filteredSearch` or non-positive `depth` becomes `configError`, is skipped, and is added to `RunSummary.sourcesFailed` (FR-001, FR-002a) — per `contracts/inputs-format.md`
 - [ ] T013 [US1] In the `collect` stage: `pipeline(sources, …)` — for each ok source, one `agent()` that opens the filtered search through the HyppoVisor read tool and returns up to `depth` posting refs **from the filtered result set** (`collectResultSchema`); zero results ⇒ record 0 for that source and continue (US1 AS-5, FR-002, FR-002b)
 - [ ] T014 [US1] In the `collect` stage: for each posting ref, an `agent()` that fetches full readable text via the HyppoVisor read tool and writes a Raw Record to `${args.dataDir}/outputs/job-records/raw/<id-slug>.md` with all FR-005 fields; skip when a Raw Record with that `id` already exists (FR-008); `status: "unavailable"` ⇒ store front-matter only, empty body (edge case)
 - [ ] T015 [US1] Add pacing: await `HYPPO_PACING_MS` (default 3000) between posting fetches per source, and stop a source once `HYPPO_FETCH_CAP` (default 300) fetches this run is reached (FR-006a); drive elapsed/counts from values threaded through `args`/stage state, not `Date.now()`
 - [ ] T016 [US1] Ingest `${args.dataDir}/inputs/manual-postings/*` as Raw Records with `retrievalMethod: "manual"` and `sourceRef` = file path; a file that isn't a job posting is skipped and added to `RunSummary.itemsSkipped` with a reason (FR-003, edge case)
 - [ ] T017 [US1] Per-source failure isolation: a source whose `agent()` throws is caught, added to `RunSummary.sourcesFailed` with the reason and to the provenance log; the run continues with other sources and exits 0 (FR-006)
 - [ ] T018 [US1] Append a provenance line per stored Raw Record; increment `postingsCollected` and `newRawRecords` (FR-007, FR-020)
-- [ ] T019 [US1] Manual validation: run quickstart Phase A against `tests/fixtures/live/boards.md` (real HyppoVisor) + fixture `manual-postings/`; verify quickstart scenarios 1, 2, 3 and the source-failure / zero-result checks by hand
+- [ ] T019 [US1] Manual validation: run quickstart Phase A against `tests/fixtures/live/settings.json` (real HyppoVisor) + fixture `manual-postings/`; verify quickstart scenarios 1, 2, 3, the source-failure / zero-result checks, and the `setupReady: false` precondition exit (FR-000) by hand
 
 **Checkpoint**: A run produces a correct, attributed Raw Record archive from real boards — MVP
 
@@ -115,8 +122,8 @@ lacked-clearance, no-direction, two plausible, one ambiguous); the first three a
 reasons, the plausible two are `kept`, the ambiguous one is `kept` + low-confidence, and only `kept`
 records get Job Records.
 
-- [ ] T026 [US3] Parse `${args.dataDir}/inputs/priorities.md` `## Hard stops` into `{ excludedLocations, lackedClearances, lackedWorkAuth }`; absent/empty ⇒ no hard stops (FR-008b) — per `contracts/inputs-format.md`
-- [ ] T027 [US3] Read `${args.dataDir}/inputs/directions/*` into `{ name, context }[]`; empty directory ⇒ no directions (FR-008d)
+- [ ] T026 [US3] Read `sections.hardStops.value` from `settings.json` into `{ excludedLocations, lackedClearances, lackedWorkAuth, visaSponsorshipRequired }`; effective excluded locations = `excludedLocations ∪ sections.locations.value.excluded`; all empty + flag false ⇒ no hard stops (FR-008b) — per `contracts/inputs-format.md`
+- [ ] T027 [US3] Read `sections.directions.value[]` from `settings.json` into `{ name, description }[]` (ignore `materialsPath`); empty ⇒ no directions (FR-008d)
 - [ ] T028 [US3] Add the `triage` stage before `normalize`: `pipeline(rawRecords, …)` — one `agent()` per Raw Record with `model: "haiku"` + `triageMarkSchema` deciding `kept`/`rejected` + one-line reason against the hard stops and direction overlap (FR-008a, FR-008b); cannot classify confidently ⇒ `kept`, `confidence: "low"` (FR-008c)
 - [ ] T029 [US3] Write the mark onto the Raw Record front-matter (`triage: { decision, reason, confidence, criteriaHash, decidedAt }` per data-model.md) where `criteriaHash` covers (hard stops + directions + raw text); recompute a mark only when the hash differs from the stored one (FR-008, R6). Never edit the Raw Record body.
 - [ ] T030 [US3] `noTriageCriteria` branch: no hard stops AND no directions ⇒ every Raw Record `kept` and `RunSummary.noTriageCriteria = true` (FR-008d)
@@ -215,7 +222,7 @@ Task: "Create fixture inputs tree in tests/fixtures/data-dir/inputs/"        # T
 Task: "Create fixture pre-made Raw Records in .../outputs/job-records/raw/"   # T003
 Task: "Create .mcp.json (repo root) for the hyppovisor MCP server"           # T004
 Task: "Create .env.example at repo root"                                     # T005
-Task: "Create tests/fixtures/live/boards.md"                                 # T006
+Task: "Create tests/fixtures/live/settings.json"                             # T006
 ```
 
 ---
@@ -225,7 +232,7 @@ Task: "Create tests/fixtures/live/boards.md"                                 # T
 ### MVP first (User Story 1 only)
 
 1. Phase 1 Setup → Phase 2 Foundational → Phase 3 US1
-2. **STOP and VALIDATE**: run against a small real `boards.md`; confirm the Raw Record archive +
+2. **STOP and VALIDATE**: run against a small real `settings.json`; confirm the Raw Record archive +
    provenance + summary (quickstart scenarios 1–3)
 3. This alone delivers the "dated archive of everything I was exposed to" value
 

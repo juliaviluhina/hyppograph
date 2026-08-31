@@ -31,11 +31,13 @@
 
 ## Notes
 
-- **Clarification resolved (Session 2026-08-31)**: structured settings store is the single source of
-  truth; onboarding regenerates the Markdown views feature 001 reads (FR-005a, SC-011); a follow-up
-  task on feature 001 later switches its parser to the store. Recorded in spec Clarifications +
-  Dependencies.
+- **Clarification resolved (Session 2026-08-31)**: structured settings store `inputs/settings.json`
+  (schema `contracts/settings-store.md`, owned here) is the single source of truth; **feature 001
+  reads it directly** — no Markdown intermediary, no follow-up parser-migration task. FR-004/FR-005/
+  FR-005a and SC-011/SC-012 updated; new `contracts/settings-store.md`. Feature 001's spec, plan,
+  research, data-model, contracts, and tasks were updated in the same pass.
+- `/speckit-clarify` (Session 2026-08-31): required sections = locations, hard stops, directions,
+  tracked boards; all others optional with defaults (Q1). "Candidate basics" is a small optional
+  section — display name + optional contact line + non-blocking `candidate-profile.md` check (Q2).
 - The interaction model (text Q&A, no GUI) and trigger (explicit only) were resolved as documented
   assumptions rather than markers.
-- Required vs optional sections are enumerated in Assumptions; revisit in `/speckit-clarify` if the
-  user wants compensation or work arrangement treated as required.
