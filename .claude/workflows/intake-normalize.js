@@ -667,7 +667,7 @@ export default async function run(args) {
     await pipeline(
       rawRecords,
       async (rec) => {
-        const thisHash = stableHash(criteriaFingerprint + " " + (rec.body || ""));
+        const thisHash = stableHash(criteriaFingerprint + "\u0000" + (rec.body || ""));
 
         // T029 — recompute only when the criteria hash differs from the stored one (R6).
         if (rec.triage && rec.triage.criteriaHash === thisHash && rec.triage.decision) {
@@ -1004,11 +1004,11 @@ async function appendProvenance(dataDir, run, entry) {
   );
 }
 
-/* sleep — pacing helper. The sandbox has no timers exposed directly; `wait` is provided by the
- * workflow runtime. If the runtime name differs, this is the single line to adjust. */
-async function sleep(ms) {
-  if (typeof wait === "function") return wait(ms);
-  // Fallback: a bounded busy-wait is NOT used (frozen clock). Pacing then relies on the
-  // per-source concurrency:1 + natural agent latency; note this in the Phase A exit review.
+/* sleep — Phase A: the workflow sandbox exposes NO timer primitive. The documented globals are
+ * agent / pipeline / parallel / phase / log only; there is no wait/sleep/setTimeout, and Date.now()
+ * throws (frozen clock). Pacing between fetches therefore relies entirely on per-source
+ * concurrency:1 + natural agent latency. args.pacingMs / HYPPO_PACING_MS is kept wired for Phase B
+ * (the plain-TS CLI) and is a documented no-op here — recorded in the Phase A exit review (T047). */
+async function sleep(_ms) {
   return undefined;
 }
