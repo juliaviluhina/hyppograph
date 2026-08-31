@@ -1,0 +1,27 @@
+# Local Claude Code state (not shared) — settings.local.json can hold
+# machine-specific permission overrides; skills/ and other shared config stay tracked.
+.claude/settings.local.json
+
+# Node
+node_modules/
+dist/
+out/
+build/
+*.log
+coverage/
+.vitest/
+.env
+.env.*
+
+# OS
+.DS_Store
+
+# Private data directory — the candidate profile, priorities, salary numbers,
+# applications, and connections never live in this repo. HyppoGraph takes the
+# directory path as local config (HYPPO_DATA_DIR); keep the folder itself
+# untracked wherever it lives.
+/data/
+vault/
+
+# design-phase reference material — kept locally, not published
+specs/initial/

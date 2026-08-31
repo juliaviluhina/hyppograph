@@ -1,0 +1,10 @@
+HyppoGraph
+Copyright 2026 Iuliia Iliukhina (https://github.com/juliaviluhina)
+
+This product is licensed under the Apache License, Version 2.0 (see LICENSE).
+
+---
+
+HyppoGraph is distributed as source only. Its runtime dependencies are installed
+by `npm install` and each retains its own license; there is no bundled binary and
+therefore no generated THIRD-PARTY-LICENSES inventory.
