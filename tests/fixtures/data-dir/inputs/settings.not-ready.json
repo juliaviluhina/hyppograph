@@ -1,0 +1,58 @@
+{
+  "version": 1,
+  "sections": {
+    "candidateBasics": {
+      "status": "unset",
+      "value": null,
+      "profileFileExists": false
+    },
+    "locations": {
+      "status": "answered",
+      "value": {
+        "preferred": ["Remote (EU)"],
+        "excluded": []
+      }
+    },
+    "workArrangement": {
+      "status": "unset",
+      "value": null
+    },
+    "compensation": {
+      "status": "unset",
+      "value": null
+    },
+    "hardStops": {
+      "status": "unset",
+      "value": null
+    },
+    "directions": {
+      "status": "answered",
+      "value": [
+        {
+          "name": "platform-dx",
+          "description": "Developer-experience and internal platform engineering roles.",
+          "materialsPath": null
+        }
+      ]
+    },
+    "trackedBoards": {
+      "status": "unset",
+      "value": null
+    },
+    "collectionTuning": {
+      "status": "unset",
+      "value": null
+    },
+    "scoringWeightNotes": {
+      "status": "unset",
+      "value": null
+    }
+  },
+  "completeness": {
+    "setupReady": false,
+    "unresolved": [
+      { "section": "hardStops", "reason": "required section not yet answered" },
+      { "section": "trackedBoards", "reason": "required section not yet answered" }
+    ]
+  }
+}

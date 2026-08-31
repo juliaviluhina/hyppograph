@@ -1,0 +1,91 @@
+{
+  "version": 1,
+  "sections": {
+    "candidateBasics": {
+      "status": "answered",
+      "value": {
+        "displayName": "Test Candidate",
+        "contactLine": "test.candidate@example.com"
+      },
+      "profileFileExists": false
+    },
+    "locations": {
+      "status": "answered",
+      "value": {
+        "preferred": ["Remote (EU)", "Berlin", "Amsterdam"],
+        "excluded": ["United States", "India"]
+      }
+    },
+    "workArrangement": {
+      "status": "answered",
+      "value": {
+        "preference": "remote-or-hybrid",
+        "onSiteTolerance": "up to 2 days/week within Berlin"
+      }
+    },
+    "compensation": {
+      "status": "skipped",
+      "value": null
+    },
+    "hardStops": {
+      "status": "answered",
+      "value": {
+        "excludedLocations": ["United States", "United Kingdom"],
+        "lackedClearances": ["US Government Security Clearance"],
+        "lackedWorkAuth": ["US work authorization"],
+        "visaSponsorshipRequired": true
+      }
+    },
+    "directions": {
+      "status": "answered",
+      "value": [
+        {
+          "name": "platform-dx",
+          "description": "Developer-experience and internal platform engineering roles: build/CI systems, SDKs, developer tooling, paved-path infrastructure for other engineers.",
+          "materialsPath": "directions/platform-dx/"
+        },
+        {
+          "name": "backend-python",
+          "description": "Backend engineering in Python: web services, APIs, data pipelines, distributed systems. Mid-to-senior individual contributor.",
+          "materialsPath": "directions/backend-python/"
+        }
+      ]
+    },
+    "trackedBoards": {
+      "status": "answered",
+      "value": [
+        {
+          "name": "weworkremotely-devops",
+          "filteredSearch": "https://weworkremotely.com/categories/remote-devops-sysadmin-jobs",
+          "depth": 25
+        },
+        {
+          "name": "linkedin-platform-eu",
+          "filteredSearch": "https://www.linkedin.com/jobs/search/?keywords=platform%20engineer&location=European%20Union&f_TPR=r604800&f_WT=2",
+          "depth": 15
+        },
+        {
+          "name": "broken-board-empty-search",
+          "filteredSearch": "",
+          "depth": 10
+        }
+      ]
+    },
+    "collectionTuning": {
+      "status": "answered",
+      "value": {
+        "pacingMs": 3000,
+        "fetchCap": 300,
+        "defaultDepth": 25
+      }
+    },
+    "scoringWeightNotes": {
+      "status": "skipped",
+      "value": null
+    }
+  },
+  "completeness": {
+    "setupReady": true,
+    "unresolved": []
+  }
+}

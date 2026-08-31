@@ -57,3 +57,9 @@
   precondition) + SC-011; `contracts/inputs-format.md`, `research.md` R5,
   `data-model.md`, `plan.md`, and tasks T002/T006/T010/T012/T026/T027 updated.
   `applications.md` and the manual-postings drop stay hand-authored.
+- Subagent policy tightened (2026-08-31): T011 gained clause (d) tier-minimality —
+  every judgment `agent()` names the lowest-fitting tier (fast/`"haiku"` only this
+  feature, per Constitution Principle II) — and clause (e) structured I/O — each
+  `agent()` takes a bounded structured payload and returns only its T007 schema, with
+  the script (not an agent) carrying state between steps (Principle I). T041 audits
+  both. No spec or constitution change — these formalise existing constraints.

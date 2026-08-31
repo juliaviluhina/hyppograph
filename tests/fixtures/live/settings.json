@@ -1,0 +1,66 @@
+{
+  "version": 1,
+  "sections": {
+    "candidateBasics": {
+      "status": "skipped",
+      "value": null,
+      "profileFileExists": false
+    },
+    "locations": {
+      "status": "answered",
+      "value": {
+        "preferred": ["Remote (EU)"],
+        "excluded": ["United States"]
+      }
+    },
+    "workArrangement": {
+      "status": "answered",
+      "value": { "preference": "remote", "onSiteTolerance": null }
+    },
+    "compensation": {
+      "status": "skipped",
+      "value": null
+    },
+    "hardStops": {
+      "status": "answered",
+      "value": {
+        "excludedLocations": ["United States"],
+        "lackedClearances": [],
+        "lackedWorkAuth": ["US work authorization"],
+        "visaSponsorshipRequired": false
+      }
+    },
+    "directions": {
+      "status": "answered",
+      "value": [
+        {
+          "name": "platform-dx",
+          "description": "Developer-experience and internal platform engineering roles: build/CI systems, SDKs, developer tooling, paved-path infrastructure.",
+          "materialsPath": null
+        }
+      ]
+    },
+    "trackedBoards": {
+      "status": "answered",
+      "value": [
+        {
+          "name": "weworkremotely-devops",
+          "filteredSearch": "https://weworkremotely.com/categories/remote-devops-sysadmin-jobs",
+          "depth": 5
+        }
+      ]
+    },
+    "collectionTuning": {
+      "status": "answered",
+      "value": { "pacingMs": 3000, "fetchCap": 25, "defaultDepth": 5 }
+    },
+    "scoringWeightNotes": {
+      "status": "skipped",
+      "value": null
+    }
+  },
+  "completeness": {
+    "setupReady": true,
+    "unresolved": []
+  }
+}
