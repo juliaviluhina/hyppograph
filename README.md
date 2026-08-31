@@ -1,15 +1,19 @@
 # HyppoGraph
 
+<img src="assets/hyppograph.png" alt="HyppoGraph" width="200" align="right">
+
 **The orchestrator that turns a stream of job descriptions into a ranked,
 decision-ready shortlist.**
 
 HyppoGraph is a deterministic workflow built on the
 [Claude Agent SDK](https://github.com/anthropics/claude-agent-sdk-typescript).
-Plain JS code drives a fixed pipeline — intake, normalize, hard-filter, score
-with evidence, warm-path enrichment, tier, generate deliverables, feedback loop —
-and a model is called only *inside* the steps that need judgment. No free-roaming
-agent decides what to do next: the code decides, the model does the cognitive
-piece of each step.
+Plain code drives a fixed pipeline — board-filtered intake, coarse triage,
+normalize, hard-filter, score with evidence, warm-path enrichment, tier, generate
+deliverables, feedback loop — and a model is called only *inside* the steps that
+need judgment. No free-roaming agent decides what to do next: the code decides,
+the model does the cognitive piece of each step.
+
+<br clear="right" />
 
 Every good match arrives with a fit score, a gap analysis, logistics fit
 (salary / location / arrangement), warm-path options from your merged connections
@@ -81,6 +85,10 @@ stays private, in a folder either app is merely pointed at.
 This repo uses [Spec Kit](https://github.com/github/spec-kit). Design intent
 lives in [`.specify/memory/constitution.md`](.specify/memory/constitution.md);
 features are specced under `specs/` via the `/speckit-*` skills.
+
+Pipeline steps are prototyped as [Claude Code dynamic
+workflows](https://code.claude.com/docs/en/workflows) — cheap to iterate in a
+session — and ported to the Claude Agent SDK once proven.
 
 ## License
 
