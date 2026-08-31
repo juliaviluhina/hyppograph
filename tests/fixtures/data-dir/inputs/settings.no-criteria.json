@@ -1,28 +1,24 @@
 {
-  "$comment": "Precondition fixture for quickstart scenario 5a / FR-000 / SC-011. Copy over settings.json (or point a scratch data dir at it) to exercise the 'setup not ready' exit: the workflow must print completeness.unresolved and write nothing.",
+  "$comment": "Fixture for quickstart scenario 5 / FR-008d / T030. hardStops all-empty and directions:[] but setupReady:true (a store hand-edited past onboarding validation). Expect: every Raw Record kept, RunSummary.noTriageCriteria === true.",
   "version": 1,
   "sections": {
     "candidateBasics": { "status": "unset", "value": { "displayName": "", "contactLine": null }, "profileFileExists": false },
-    "locations": {
-      "status": "answered",
-      "value": { "preferred": ["Remote (EU)"], "excluded": [] }
-    },
+    "locations": { "status": "answered", "value": { "preferred": [], "excluded": [] } },
     "workArrangement": { "status": "skipped", "value": { "preference": "remote-or-hybrid", "onSiteTolerance": null } },
     "compensation": { "status": "skipped", "value": { "floor": 0, "target": null, "currency": "EUR", "benchmarkNotes": null } },
     "hardStops": {
       "status": "answered",
       "value": { "excludedLocations": [], "lackedClearances": [], "lackedWorkAuth": [], "visaSponsorshipRequired": false }
     },
-    "directions": { "status": "unset", "value": [] },
-    "trackedBoards": { "status": "unset", "value": [] },
+    "directions": { "status": "answered", "value": [] },
+    "trackedBoards": {
+      "status": "answered",
+      "value": [
+        { "name": "Himalayas — AI Engineer", "filteredSearch": "https://himalayas.app/jobs/ai-engineer", "depth": 2 }
+      ]
+    },
     "collectionTuning": { "status": "skipped", "value": { "pacingMs": 3000, "fetchCap": 300, "defaultDepth": 25 } },
     "scoringWeightNotes": { "status": "skipped", "value": { "text": "" } }
   },
-  "completeness": {
-    "setupReady": false,
-    "unresolved": [
-      { "section": "directions", "reason": "unset" },
-      { "section": "trackedBoards", "reason": "unset" }
-    ]
-  }
+  "completeness": { "setupReady": true, "unresolved": [] }
 }

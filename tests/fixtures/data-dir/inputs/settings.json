@@ -3,36 +3,27 @@
   "sections": {
     "candidateBasics": {
       "status": "answered",
-      "value": {
-        "displayName": "Test Candidate",
-        "contactLine": "test.candidate@example.com"
-      },
+      "value": { "displayName": "Test Candidate", "contactLine": null },
       "profileFileExists": false
     },
     "locations": {
       "status": "answered",
-      "value": {
-        "preferred": ["Remote (EU)", "Berlin", "Amsterdam"],
-        "excluded": ["United States", "India"]
-      }
+      "value": { "preferred": ["Remote (EU)", "Berlin"], "excluded": ["Onsite USA"] }
     },
     "workArrangement": {
       "status": "answered",
-      "value": {
-        "preference": "remote-or-hybrid",
-        "onSiteTolerance": "up to 2 days/week within Berlin"
-      }
+      "value": { "preference": "remote-or-hybrid", "onSiteTolerance": null }
     },
     "compensation": {
       "status": "skipped",
-      "value": null
+      "value": { "floor": 0, "target": null, "currency": "EUR", "benchmarkNotes": null }
     },
     "hardStops": {
       "status": "answered",
       "value": {
-        "excludedLocations": ["United States", "United Kingdom"],
-        "lackedClearances": ["US Government Security Clearance"],
-        "lackedWorkAuth": ["US work authorization"],
+        "excludedLocations": ["United States (on-site)", "India"],
+        "lackedClearances": ["US Security Clearance (TS/SCI)"],
+        "lackedWorkAuth": [],
         "visaSponsorshipRequired": true
       }
     },
@@ -40,14 +31,14 @@
       "status": "answered",
       "value": [
         {
-          "name": "platform-dx",
-          "description": "Developer-experience and internal platform engineering roles: build/CI systems, SDKs, developer tooling, paved-path infrastructure for other engineers.",
-          "materialsPath": "directions/platform-dx/"
+          "name": "AI Engineering",
+          "description": "Applied AI / LLM engineering roles: building products on top of foundation models, RAG pipelines, agent frameworks, prompt/eval infrastructure, inference serving. Python or TypeScript.",
+          "materialsPath": "directions/ai-engineering/"
         },
         {
-          "name": "backend-python",
-          "description": "Backend engineering in Python: web services, APIs, data pipelines, distributed systems. Mid-to-senior individual contributor.",
-          "materialsPath": "directions/backend-python/"
+          "name": "Test Automation",
+          "description": "Senior SDET / test automation architect roles: end-to-end and API test frameworks, CI test infrastructure, Playwright/Selenium, quality strategy for engineering orgs.",
+          "materialsPath": "directions/test-automation/"
         }
       ]
     },
@@ -55,33 +46,29 @@
       "status": "answered",
       "value": [
         {
-          "name": "weworkremotely-devops",
-          "filteredSearch": "https://weworkremotely.com/categories/remote-devops-sysadmin-jobs",
-          "depth": 25
+          "name": "WeWorkRemotely — AI",
+          "filteredSearch": "https://weworkremotely.com/categories/remote-programming-jobs#search?term=AI+engineer",
+          "depth": 3
         },
         {
-          "name": "linkedin-platform-eu",
-          "filteredSearch": "https://www.linkedin.com/jobs/search/?keywords=platform%20engineer&location=European%20Union&f_TPR=r604800&f_WT=2",
-          "depth": 15
+          "name": "Himalayas — AI Engineer",
+          "filteredSearch": "https://himalayas.app/jobs/ai-engineer",
+          "depth": 2
         },
         {
-          "name": "broken-board-empty-search",
+          "name": "Broken board (empty search)",
           "filteredSearch": "",
-          "depth": 10
+          "depth": 5
         }
       ]
     },
     "collectionTuning": {
       "status": "answered",
-      "value": {
-        "pacingMs": 3000,
-        "fetchCap": 300,
-        "defaultDepth": 25
-      }
+      "value": { "pacingMs": 3000, "fetchCap": 300, "defaultDepth": 25 }
     },
     "scoringWeightNotes": {
       "status": "skipped",
-      "value": null
+      "value": { "text": "" }
     }
   },
   "completeness": {

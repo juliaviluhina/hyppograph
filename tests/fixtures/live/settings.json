@@ -1,66 +1,29 @@
 {
+  "$comment": "SMALL LIVE settings store for the manual collect check (T019, quickstart 'Manual end-to-end'). One real board search at depth 5. Point HYPPO_DATA_DIR at a SCRATCH dir, copy this to inputs/settings.json there, and run the workflow with real HyppoVisor. Do NOT put a real HYPPO_DATA_DIR in this repo (Principle V) — see README.md.",
   "version": 1,
   "sections": {
-    "candidateBasics": {
-      "status": "skipped",
-      "value": null,
-      "profileFileExists": false
-    },
-    "locations": {
-      "status": "answered",
-      "value": {
-        "preferred": ["Remote (EU)"],
-        "excluded": ["United States"]
-      }
-    },
-    "workArrangement": {
-      "status": "answered",
-      "value": { "preference": "remote", "onSiteTolerance": null }
-    },
-    "compensation": {
-      "status": "skipped",
-      "value": null
-    },
+    "candidateBasics": { "status": "unset", "value": { "displayName": "", "contactLine": null }, "profileFileExists": false },
+    "locations": { "status": "answered", "value": { "preferred": ["Remote (EU)"], "excluded": [] } },
+    "workArrangement": { "status": "skipped", "value": { "preference": "remote-or-hybrid", "onSiteTolerance": null } },
+    "compensation": { "status": "skipped", "value": { "floor": 0, "target": null, "currency": "EUR", "benchmarkNotes": null } },
     "hardStops": {
       "status": "answered",
-      "value": {
-        "excludedLocations": ["United States"],
-        "lackedClearances": [],
-        "lackedWorkAuth": ["US work authorization"],
-        "visaSponsorshipRequired": false
-      }
+      "value": { "excludedLocations": ["United States (on-site)"], "lackedClearances": ["US Security Clearance (TS/SCI)"], "lackedWorkAuth": [], "visaSponsorshipRequired": false }
     },
     "directions": {
       "status": "answered",
       "value": [
-        {
-          "name": "platform-dx",
-          "description": "Developer-experience and internal platform engineering roles: build/CI systems, SDKs, developer tooling, paved-path infrastructure.",
-          "materialsPath": null
-        }
+        { "name": "AI Engineering", "description": "Applied AI / LLM engineering: building products on foundation models, RAG, agents, eval infrastructure, inference serving. Python or TypeScript.", "materialsPath": null }
       ]
     },
     "trackedBoards": {
       "status": "answered",
       "value": [
-        {
-          "name": "weworkremotely-devops",
-          "filteredSearch": "https://weworkremotely.com/categories/remote-devops-sysadmin-jobs",
-          "depth": 5
-        }
+        { "name": "WeWorkRemotely — AI", "filteredSearch": "https://weworkremotely.com/remote-jobs/search?term=AI+engineer", "depth": 5 }
       ]
     },
-    "collectionTuning": {
-      "status": "answered",
-      "value": { "pacingMs": 3000, "fetchCap": 25, "defaultDepth": 5 }
-    },
-    "scoringWeightNotes": {
-      "status": "skipped",
-      "value": null
-    }
+    "collectionTuning": { "status": "answered", "value": { "pacingMs": 3000, "fetchCap": 300, "defaultDepth": 25 } },
+    "scoringWeightNotes": { "status": "skipped", "value": { "text": "" } }
   },
-  "completeness": {
-    "setupReady": true,
-    "unresolved": []
-  }
+  "completeness": { "setupReady": true, "unresolved": [] }
 }

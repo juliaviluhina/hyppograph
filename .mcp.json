@@ -1,0 +1,12 @@
+{
+  "$comment": "Claude Code project-scope MCP config for the Phase A intake-normalize workflow prototype. HyppoVisor is the ONLY server, and only its read/navigation tools are used (Principle IV). No literal tokens — values expand from the environment (see .env.example). Real runs need HYPPO_VISOR_MCP_URL + HYPPO_VISOR_MCP_TOKEN set.",
+  "mcpServers": {
+    "hyppovisor": {
+      "type": "http",
+      "url": "${HYPPO_VISOR_MCP_URL}",
+      "headers": {
+        "Authorization": "Bearer ${HYPPO_VISOR_MCP_TOKEN}"
+      }
+    }
+  }
+}
