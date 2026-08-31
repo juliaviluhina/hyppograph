@@ -45,3 +45,8 @@
   (User Story 3) sitting between collection and normalization.
 - Scope note: pre-triage is a high-recall non-starter filter only; full fit/gap
   analysis remains a downstream feature.
+- Post-`/speckit-analyze` remediation (2026-08-31): FR-017 given a concrete
+  threshold (≥60% unknown, or key field missing); MCP config path corrected to
+  repo-root `.mcp.json`; Principle I / V guardrails and read-only-inputs clause
+  folded into tasks T010/T011/T041; SC-006a / SC-007 percentage targets marked
+  spot-checked in Phase A, measured in Phase B.

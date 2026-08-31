@@ -78,7 +78,7 @@ human-readable body. Written only for RawRecords with `triage.decision === "kept
 | `employmentType` | string | or `"unknown"` |
 | `postingDate` | ISO 8601 string \| `"unknown"` | |
 | `originalLanguage` | string | `"en"` unless the source posting was another language (FR-013) |
-| `completeness` | `"ok"` \| `"low"` | `low` when most fixed fields are `"unknown"` (FR-017) |
+| `completeness` | `"ok"` \| `"low"` | `low` when ≥ 60% of fixed-field values are `"unknown"`, or when `roleTitle` / `canonicalCompany` / the requirements list is unknown or empty (FR-017) |
 | `sources` | SourceLink[] | One per place the role was seen: `{ sourceName, sourceRef, rawRecordId }` |
 | `appliedEntryRef` | string \| null | Link to an ApplicationsTrackerEntry when company+role match (FR-016) |
 | `alreadyApplied` | boolean | `true` iff `appliedEntryRef` set |

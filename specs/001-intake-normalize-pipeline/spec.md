@@ -18,6 +18,7 @@
 - Q: In what form should a Job Record be stored? → A: One Markdown file per record with a structured front-matter block for the fixed field set plus a human-readable body; the raw posting text is a linked sibling file.
 - Q: Should intake collect everything or gate on relevance? → A: Collect all N latest verbatim (no relevance decision blocks storage), but apply board-native filters upstream so retrieval is already preliminarily scoped, and apply a cheap keep/reject pre-triage before normalization.
 - Q: What does the pre-triage step decide, and with what? → A: A fast-tier (Haiku-class) yes/no keep decision per Raw Record — reject on hard stops (disallowed location, required clearance/work-authorization the user lacks) or no plausible match to any of the user's considered directions; keep otherwise. Full fit and gap analysis is a later pipeline step, not this feature.
+- Q: What threshold makes a Job Record low-completeness? → A: ≥ 60% of fixed-field values are "unknown", or any of role title / canonical company / requirements list is unknown or empty (FR-017).
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -193,7 +194,7 @@ elsewhere in the user's data.
 - **FR-014**: The system MUST resolve differing spellings and forms of the same company to one canonical company name, consistent with company names already present in the user's data.
 - **FR-015**: The system MUST identify a Job Record by the deterministic key {canonical company, normalized role title, overlapping location set}, and MUST merge every posting matching that key into the one Job Record — adding each new source reference to the existing record in place rather than creating a new record.
 - **FR-016**: The system MUST link a Job Record to an existing applications-tracker entry when the company and role match, and mark that record as already-applied.
-- **FR-017**: The system MUST flag Job Records whose required fields are mostly "unknown" as low-completeness.
+- **FR-017**: The system MUST flag a Job Record as low-completeness when at least 60% of its fixed-field-set values are "unknown", or when any of role title, canonical company, or the requirements list is unknown or empty.
 - **FR-018**: The system MUST NOT contact any job poster, submit any application, or take any outward-facing action during intake, pre-triage, or normalize.
 - **FR-019**: The system MUST write all raw records, Job Records, and provenance entries only into the user-configured data directory, and MUST NOT copy the user's personal input data elsewhere.
 - **FR-020**: Each run MUST end with a summary stating counts of postings collected, new raw records, records kept and rejected by pre-triage (with a breakdown of reject reasons), low-confidence triage marks, new Job Records, duplicates merged, sources failed, and items skipped.

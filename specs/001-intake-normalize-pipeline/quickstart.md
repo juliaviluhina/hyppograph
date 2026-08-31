@@ -59,7 +59,13 @@ per-record model failure is reported in the summary, not a crash.
 
 ## Validation scenarios
 
-Run with `npm test` (vitest). Each maps to spec acceptance criteria / success criteria.
+Phase A: run each by hand in a Claude Code session against the fixtures. Phase B: automated with
+`npm test` (vitest). Each maps to spec acceptance criteria / success criteria.
+
+**Note on percentage targets**: SC-006a (triage recall ≥ 85% / false-reject ≤ 2%) and SC-007 (dedup
+merge ≥ 90% / wrong-merge ≤ 2%) are only **spot-checked** on the labelled fixtures in Phase A — the
+fixture set is too small to measure a percentage. Their numeric targets are measured against a
+labelled eval set in Phase B.
 
 ### 1. Collect stores everything from the filtered set — US1, SC-001, SC-002, SC-002a
 `tests/integration/collect.spec.ts`: two fixture sources (depth N) + one manual posting, faked
