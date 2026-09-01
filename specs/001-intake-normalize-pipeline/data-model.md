@@ -81,11 +81,12 @@ human-readable body. Written only for RawRecords with `triage.decision === "kept
 
 | Key | Type | Notes |
 |---|---|---|
-| `key` | string | Deterministic identity: slug of `{canonicalCompany, normalizedTitle, locationSet}` (FR-015) |
+| `key` | string | Deterministic identity: slug of `{canonicalCompany, normalizedTitle, locationBucket}` (FR-015) |
 | `roleTitle` | string | As stated |
 | `normalizedTitle` | string | Lowercased/canonical form used in `key` and dedup |
 | `canonicalCompany` | string | Resolved via CanonicalCompany (FR-014) |
-| `locations` | string[] | May be `["unknown"]` |
+| `locations` | string[] | Human-readable, as stated; may be `["unknown"]`. **Not** used in `key` |
+| `locationBucket` | string | Coarse dedup key component: `"remote-<region>"` (e.g. `remote-eu`), a `"<city>"`, or `"unknown"`. Collapses board-specific phrasings ("Remote (EU)" / "(Remote, EU)" / "EU-remote" → `remote-eu`) so one role seen on two boards does not split into two Job Records |
 | `workArrangement` | `"remote"` \| `"hybrid"` \| `"on-site"` \| `"unknown"` | |
 | `salaryAmountOrRange` | string | Verbatim as stated, or `"unknown"` — never converted (FR-010) |
 | `salaryCurrency` | string | or `"unknown"` |

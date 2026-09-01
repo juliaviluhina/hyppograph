@@ -187,6 +187,7 @@ const jobRecordFieldsSchema = {
     "normalizedTitle",
     "companyAsStated",
     "locations",
+    "locationBucket",
     "workArrangement",
     "salaryAmountOrRange",
     "salaryCurrency",
@@ -201,7 +202,8 @@ const jobRecordFieldsSchema = {
     roleTitle: { type: "string" },
     normalizedTitle: { type: "string" }, // lowercased / canonical form used in the key + dedup
     companyAsStated: { type: "string" }, // resolved to canonical form by the workflow (T034)
-    locations: { type: "array", items: { type: "string" } }, // may be ["unknown"]
+    locations: { type: "array", items: { type: "string" } }, // may be ["unknown"] — human-readable, verbatim-ish
+    locationBucket: { type: "string" }, // COARSE stable dedup key: "remote-<region>" | "<city>" | "unknown"
     workArrangement: { enum: ["remote", "hybrid", "on-site", "unknown"] },
     salaryAmountOrRange: { type: "string" }, // verbatim as stated, or "unknown" — never converted
     salaryCurrency: { type: "string" },
@@ -752,6 +754,13 @@ phase("normalize");
           "    (\"en\" if it was English); if it was not English, translate the extracted values.",
           "  - normalizedTitle: a lowercased canonical form of roleTitle (strip seniority prefixes",
           "    only if they are also captured in `seniority`).",
+          "  - locationBucket: a COARSE, STABLE key used for cross-source dedup — NOT a display value.",
+          "    * Remote roles => \"remote-<region>\" where <region> is the lowercased zone the posting",
+          "      implies: remote-eu, remote-us, remote-uk, remote-global. Collapse every phrasing to the",
+          "      same bucket: \"Remote (EU)\", \"EU-remote\", \"Europe, remote\", \"remote within Europe\",",
+          "      \"(Remote, EU)\" => ALL \"remote-eu\".",
+          "    * City/office-anchored roles (on-site or hybrid) => the lowercased primary city: berlin, london.",
+          "    * Nothing stated => \"unknown\".",
           "",
           "POSTING TEXT:",
           (rec.body || "").slice(0, 16000),
@@ -761,7 +770,13 @@ phase("normalize");
 
       const canonicalCompany = canonOf(fields.companyAsStated);
       const locs = (fields.locations && fields.locations.length ? fields.locations : ["unknown"]).slice();
-      const locKey = [...new Set(locs.map((l) => slug(l)).filter(Boolean))].sort().join("_") || "unknown";
+      // Dedup key uses the COARSE locationBucket, not the free-text locations[] — two boards phrase
+      // the same location differently ("Remote (EU)" vs "EU"), which used to split one role into two
+      // Job Records. Fall back to the old locations-derived slug only when the bucket is unknown.
+      const locKey =
+        slug(fields.locationBucket) ||
+        [...new Set(locs.map((l) => slug(l)).filter(Boolean))].sort().join("_") ||
+        "unknown";
       const key = `${slug(canonicalCompany)}--${slug(fields.normalizedTitle || fields.roleTitle)}--${locKey}`;
 
       // T023 — completeness: low when >=60% of fixed-field values are "unknown", or a core field is missing.
@@ -834,13 +849,15 @@ phase("normalize");
           "",
           "## Sources",
           "",
-          `- [Raw record](./raw/${slug(rec.id)}.md)`,
+          `- [Raw record](./raw/${rec.path.split("/").pop()})`,
           "",
           "STEP 3 — if the target file DOES exist (a duplicate role from another source): do NOT",
-          "create a second file. Append this run's SourceLink to `sources` if its rawRecordId is not",
-          "already listed; fill any front-matter field whose current value is \"unknown\" from this",
-          "posting's values above, but NEVER overwrite an already-stated value with \"unknown\";",
-          "add the raw-record link under ## Sources. Report merged=true.",
+          "create a second file. Append this SourceLink to `sources` if its rawRecordId is not",
+          `already listed:  - { sourceName: <from the raw record>, sourceRef: ${JSON.stringify(rec.id)}, rawRecordId: ${JSON.stringify(rec.id)} }`,
+          "fill any front-matter field whose current value is \"unknown\" from this posting's values",
+          "above, but NEVER overwrite an already-stated value with \"unknown\"; add this line under",
+          `## Sources if not already there:  - [Raw record](./raw/${rec.path.split("/").pop()})`,
+          "Report merged=true.",
           "",
           "Return: created (bool), merged (bool), path (relative), alreadyApplied (bool).",
         ].join("\n"),

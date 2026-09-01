@@ -15,7 +15,7 @@ Phase B (`@anthropic-ai/claude-agent-sdk`) re-expresses these same shapes as `zo
 | 1 | `collectResultSchema` | `open-search:<source>` (collect) | Open one filtered board search; return `opened` + up to `depth` `postingRefs[] {url, listMeta}` from the filtered result set (FR-002, FR-002b) |
 | 2 | `fetchPostingSchema` | `fetch:<url>` (collect) | Fetch one posting's verbatim text and write its Raw Record; report `status` (ok/unavailable), `rawRecordPath`, `written` (false ⇒ already existed, FR-008) |
 | 3 | `triageMarkSchema` | `triage:<id>` (triage) | One keep/reject decision per Raw Record: `decision`, one-line `reason`, `confidence` (low ⇒ default keep, FR-008c) |
-| 4 | `jobRecordFieldsSchema` | `normalize:<id>` (normalize) | Extract the fixed field set from one posting; every key present; `"unknown"` for anything unstated, never inferred (FR-009, FR-010); `requirements` as discrete items (FR-011); `originalLanguage` + English values (FR-013) |
+| 4 | `jobRecordFieldsSchema` | `normalize:<id>` (normalize) | Extract the fixed field set from one posting; every key present; `"unknown"` for anything unstated, never inferred (FR-009, FR-010); `requirements` as discrete items (FR-011); `originalLanguage` + English values (FR-013); `locationBucket` is a coarse dedup key (`remote-<region>` / `<city>` / `unknown`) that collapses board-specific location phrasings (FR-015) |
 | 5 | `dedupGroupSchema` | `canonicalise-companies` (normalize) | Resolve every observed company name to one `canonical` form with its `variants[]` (FR-014) |
 
 ## Supporting write-only schemas

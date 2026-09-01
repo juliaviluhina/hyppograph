@@ -14,7 +14,7 @@
     "trackedBoards": {
       "status": "answered",
       "value": [
-        { "name": "Himalayas — AI Engineer", "filteredSearch": "https://himalayas.app/jobs/ai-engineer", "depth": 2 }
+        { "name": "Himalayas — AI Engineer", "filteredSearch": "https://boards.example.com/himalayas/jobs/ai-engineer", "depth": 2 }
       ]
     },
     "collectionTuning": { "status": "skipped", "value": { "pacingMs": 3000, "fetchCap": 300, "defaultDepth": 25 } },

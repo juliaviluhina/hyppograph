@@ -47,12 +47,12 @@
       "value": [
         {
           "name": "WeWorkRemotely — AI",
-          "filteredSearch": "https://weworkremotely.com/categories/remote-programming-jobs#search?term=AI+engineer",
+          "filteredSearch": "https://boards.example.com/weworkremotely/search?term=AI+engineer",
           "depth": 3
         },
         {
           "name": "Himalayas — AI Engineer",
-          "filteredSearch": "https://himalayas.app/jobs/ai-engineer",
+          "filteredSearch": "https://boards.example.com/himalayas/jobs/ai-engineer",
           "depth": 2
         },
         {
