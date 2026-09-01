@@ -39,7 +39,16 @@ and `alreadyApplied` — they are **not** asked of the extraction subagent.
 ## Tier & tools per call (Principle II / IV)
 
 Every schema-bearing `agent()` above runs at `model: "haiku"` (fast tier — the only tier this feature
-uses). Tool grants: `read-settings` / `index-raw-records` → `["Read"]`; `open-search:*` → the six
-HyppoVisor read/navigation tools; `fetch:*` → those six + `Write`; `triage:*` / `normalize:*` → `[]`
-(pure judgment, no tools); the write-only calls → `["Read", "Write"]` or `["Write"]`. No call is ever
-granted `Edit`, `Bash`, `mcp__hyppovisor__interact`, or any submit/send capability.
+uses). Tools are **not** passed per call — each `agent()` names an `agentType` (a custom subagent def
+in `.claude/agents/`) that carries the grant:
+
+| `agent()` call(s) | `agentType` | tools |
+|---|---|---|
+| `read-settings`, `index-raw-records` | `hyppo-read` | `Read` |
+| `open-search:*` | `hyppo-collect-list` | the six HyppoVisor read/navigation tools |
+| `fetch:*` | `hyppo-collect-fetch` | those six + `Write` |
+| `triage:*`, `normalize:*` | `hyppo-judge` | nominal `Read`, never used (a zero-tool subagent cannot launch; the prompt forbids tool use) |
+| `write-triage:*`, `canonicalise-companies`, `write-job-record:*`, `ingest-manual-postings`, `provenance` | `hyppo-readwrite` | `Read, Write` |
+| `write-run-summary` | `hyppo-write` | `Write` |
+
+No def grants `Edit`, `Bash`, `mcp__hyppovisor-hyppograph__interact`, or any submit/send capability.

@@ -8,9 +8,11 @@ Decision / Rationale / Alternatives considered.
 ## R0. Orchestration substrate — phased
 
 **Decision**: Prototype the collect→triage→normalize flow as a **Claude Code dynamic workflow**
-(`.claude/workflows/intake-normalize.js`): `phase()` per step, `pipeline()` over sources / raw records
-/ kept records, one bounded `agent()` per unit of work with a JSON `schema`, HyppoVisor reached via
-subagent MCP instructions. Iterate it inside a Claude Code session (plan-billed). Once the flow is
+(`.claude/workflows/intake-normalize.js`): a top-level body with `phase()` markers per step, serial
+`for` loops over sources / kept records and a `pipeline()` over raw records for triage, one bounded
+`agent()` per unit of work with a JSON `schema`, per-agent tool policy via custom `agentType`
+definitions in `.claude/agents/`, HyppoVisor reached through the collect subagents' MCP tools.
+Iterate it inside a Claude Code session (plan-billed). Once the flow is
 proven against fixtures and one small live run (Phase A exit criteria in plan.md), decide between
 **B1** — keep the script, invoke it from a thin Agent SDK harness through the `Workflow` tool — or
 **B2** — rewrite the orchestration as plain TypeScript on `@anthropic-ai/claude-agent-sdk` for CI,
@@ -91,10 +93,10 @@ breaks the single-audit-point the review checklist relies on.
    honouring the source's collection depth.
 2. `fetchPosting(ref): Promise<{ text: string; retrievedAt: string; finalUrl: string; status: "ok" | "unavailable" }>`
    — retrieve one posting's full readable text.
-The adapter calls HyppoVisor through `query()` `options.mcpServers = { hyppovisor: { type: "http",
-url: HYPPO_VISOR_MCP_URL, headers: { Authorization: ... } } }` (stdio config also supported via env),
-with `allowedTools` restricted to HyppoVisor's **read/navigation** tool names only
-(`mcp__hyppovisor__*` narrowed to the read subset once the contract is confirmed).
+The adapter (Phase B) calls HyppoVisor through `query()` `options.mcpServers` (an `http`/`sse`/`stdio`
+config, endpoint from a config value), with `allowedTools` restricted to the six confirmed
+`mcp__hyppovisor-hyppograph__` **read/navigation** tool names only. (Phase A does the same via the
+`hyppo-collect-*` subagent `tools:` lines — see `contracts/hyppovisor-page-read.md`.)
 
 **Rationale**: The constitution says depend only on HyppoVisor's documented MCP surface and keep the
 contract third-party-implementable. Isolating the two operations above in one adapter means the rest of
@@ -194,3 +196,8 @@ and normalize.
 
 **Alternatives considered**: Token-bucket / adaptive backoff on 429 signals — deferred; the fixed
 delay + cap is enough for current scale and easier to reason about.
+
+**Phase A note**: the dynamic-workflow sandbox has no timer primitive (no `wait`/`sleep`/`setTimeout`;
+`Date.now()` throws), so `sleep()` in `intake-normalize.js` is a documented no-op. Phase A pacing
+relies on serial collect (one source, one fetch at a time) + agent latency; the `HYPPO_FETCH_CAP`
+hard stop still applies. `HYPPO_PACING_MS` is wired for the Phase B CLI. Recorded in the T047 exit review.

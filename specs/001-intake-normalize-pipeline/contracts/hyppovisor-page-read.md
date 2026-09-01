@@ -5,38 +5,42 @@ The **only** capability this feature needs from HyppoVisor. Expressed as the int
 place (R3).
 
 All operations are **read / navigation only**. No operation submits, sends, posts, or mutates any
-remote state (Principle IV, FR-018). `allowedTools` for the `query()` call that carries these
-operations is restricted to HyppoVisor's read-tool names; no write-capable tool is allow-listed.
+remote state (Principle IV, FR-018). The tool grant is restricted to HyppoVisor's read-tool names —
+in Phase A by the `hyppo-collect-list` / `hyppo-collect-fetch` subagent definitions
+(`.claude/agents/`), in Phase B by `allowedTools` on the `query()` call; no write-capable HyppoVisor
+tool is granted in either.
 
 ## Confirmed tool mapping (HyppoVisor MCP, verified 2026-08-31)
 
-The live `hyppovisor` MCP server exposes eight tools:
+Server renamed to the per-project named instance `hyppovisor-hyppograph` on 2026-09-01 (committed
+`.mcp.json`, literal endpoint, port 7359). The live `hyppovisor-hyppograph` MCP server exposes eight tools:
 `interact, list_open_tabs, navigate, open_url, read_form_fields, read_page, screenshot, wait_for_selector`.
 
 | This contract | HyppoVisor MCP tool(s) | Notes |
 |---|---|---|
-| open a filtered search / a posting URL | `mcp__hyppovisor__open_url`, `mcp__hyppovisor__navigate` | navigation only |
-| wait for a lazy-loaded result list | `mcp__hyppovisor__wait_for_selector` | |
-| read the rendered page text | `mcp__hyppovisor__read_page` | the primary read |
-| inspect form fields (diagnostic only) | `mcp__hyppovisor__read_form_fields` | not used for collection; read-only |
-| enumerate open tabs | `mcp__hyppovisor__list_open_tabs` | |
-| capture a screenshot (diagnostic only) | `mcp__hyppovisor__screenshot` | read-only |
+| open a filtered search / a posting URL | `mcp__hyppovisor-hyppograph__open_url`, `mcp__hyppovisor-hyppograph__navigate` | navigation only |
+| wait for a lazy-loaded result list | `mcp__hyppovisor-hyppograph__wait_for_selector` | |
+| read the rendered page text | `mcp__hyppovisor-hyppograph__read_page` | the primary read |
+| inspect form fields (diagnostic only) | `mcp__hyppovisor-hyppograph__read_form_fields` | not used for collection; read-only |
+| enumerate open tabs | `mcp__hyppovisor-hyppograph__list_open_tabs` | |
+| capture a screenshot (diagnostic only) | `mcp__hyppovisor-hyppograph__screenshot` | read-only |
 
-**Allow-list** (Phase A `.mcp.json` + every `agent()` `allowedTools` in the collect stage):
+**Allow-list** (the `tools:` line of `.claude/agents/hyppo-collect-list.md` and
+`hyppo-collect-fetch.md`; Phase B: `allowedTools` on the collect `query()`):
 
 ```
-mcp__hyppovisor__open_url
-mcp__hyppovisor__navigate
-mcp__hyppovisor__wait_for_selector
-mcp__hyppovisor__read_page
-mcp__hyppovisor__read_form_fields
-mcp__hyppovisor__list_open_tabs
+mcp__hyppovisor-hyppograph__open_url
+mcp__hyppovisor-hyppograph__navigate
+mcp__hyppovisor-hyppograph__wait_for_selector
+mcp__hyppovisor-hyppograph__read_page
+mcp__hyppovisor-hyppograph__read_form_fields
+mcp__hyppovisor-hyppograph__list_open_tabs
 ```
 
-`mcp__hyppovisor__interact` (clicks / typing / form entry) is the one state-changing tool and is
-**never** allow-listed anywhere in this feature. `screenshot` is read-only but not needed by the
-workflow; omit it from `allowedTools` unless debugging a collect run by hand. The wildcard
-`mcp__hyppovisor__*` is **not** acceptable here because `interact` is in the set.
+`mcp__hyppovisor-hyppograph__interact` (clicks / typing / form entry) is the one state-changing tool
+and appears in **no** `hyppo-*.md` definition. `screenshot` is read-only but not needed by the
+workflow; it is left out too. The wildcard `mcp__hyppovisor-hyppograph__*` / `mcp__hyppovisor-hyppograph`
+is **not** acceptable here because `interact` is in the set — the six tools are enumerated by name.
 
 ---
 
@@ -79,21 +83,25 @@ not an error — caller stores a RawRecord with `availability: "unavailable"` an
 
 ## Connection
 
-`query()` `options.mcpServers`:
+**Phase A** — the committed `.mcp.json` registers the per-project named instance:
 
 ```
 {
-  hyppovisor: {
-    type: "http",                       // or "sse"; stdio via HYPPO_VISOR_MCP_CMD
-    url: process.env.HYPPO_VISOR_MCP_URL,
-    headers: { Authorization: `Bearer ${process.env.HYPPO_VISOR_MCP_TOKEN}` }
+  "mcpServers": {
+    "hyppovisor-hyppograph": { "type": "http", "url": "http://127.0.0.1:7359/mcp" }
   }
 }
 ```
 
-`options.allowedTools` = the six read/navigation tool names listed under **Allow-list** above
-(`open_url`, `navigate`, `wait_for_selector`, `read_page`, `read_form_fields`, `list_open_tabs`).
-Wildcard `mcp__hyppovisor__*` is **not** acceptable — `mcp__hyppovisor__interact` is state-changing.
+No env vars. Launch the instance with
+`open -na HyppoVisor --args --instance hyppograph --port 7359`. The read-only grant lives in the
+`hyppo-collect-*` subagent `tools:` lines, not here.
+
+**Phase B** — the Agent SDK harness passes `query()` `options.mcpServers` (an `http`/`sse`/`stdio`
+config, endpoint from a config value) with `options.allowedTools` = the six read/navigation tool
+names listed under **Allow-list** above (`open_url`, `navigate`, `wait_for_selector`, `read_page`,
+`read_form_fields`, `list_open_tabs`). Wildcard `mcp__hyppovisor-hyppograph__*` is **not** acceptable
+— `mcp__hyppovisor-hyppograph__interact` is state-changing.
 
 ## Pacing (caller-side, not part of this contract)
 
@@ -107,18 +115,20 @@ source at `HYPPO_FETCH_CAP` (default 300) total fetches per run (FR-006a).
 Checks against `.claude/workflows/intake-normalize.js` at Phase A completion:
 
 **Principle IV — the human owns the last mile.**
-- `.mcp.json` defines only the `hyppovisor` server; no tools are globally enabled there.
-- Every collect `agent()` (`open-search:*`, `fetch:*`) is granted exactly the six read/navigation
-  tools (`HV_READ_TOOLS`); `fetch:*` additionally gets `Write`. `mcp__hyppovisor__interact` is
+- `.mcp.json` defines only the `hyppovisor-hyppograph` server; no tools are globally enabled there.
+- Tool grants are carried by six `.claude/agents/hyppo-*.md` `agentType` defs, not per-call
+  `allowedTools`. `open-search:*` → `hyppo-collect-list` (exactly the six read/navigation tools);
+  `fetch:*` → `hyppo-collect-fetch` (those six + `Write`). `mcp__hyppovisor-hyppograph__interact` is
   granted **nowhere**.
-- `triage:*` and `normalize:*` are granted `[]` (pure judgment). Write-only helpers get
-  `["Read","Write"]` or `["Write"]`. No `agent()` anywhere lists `Edit`, `Bash`, or a submit/send tool.
+- `triage:*` and `normalize:*` → `hyppo-judge` (a nominal `Read` it is told never to use — a
+  zero-tool subagent cannot launch; pure judgment otherwise). Write helpers → `hyppo-readwrite`
+  (`Read, Write`) or `hyppo-write` (`Write`). No def lists `Edit`, `Bash`, or a submit/send tool.
 
 **Principle I — deterministic, code-driven orchestration.**
-- The default-export `run()` body is the only sequencer: `read-settings` gate → `phase("collect")` →
-  `phase("triage")` → `phase("normalize")` → summary, in fixed order. No `agent()` return value is
-  branched on to choose *what stage runs next* — results only update counters, provenance, and the
-  per-record `_decision` used to filter the normalize input list.
+- The top-level script body is the only sequencer: `read-settings` gate → `phase("collect")` →
+  `phase("triage")` → `phase("normalize")` → summary → top-level `return`, in fixed order. No
+  `agent()` return value is branched on to choose *what stage runs next* — results only update
+  counters, provenance, and the per-record `_decision` used to filter the normalize input list.
 - Each `agent()` prompt is one bounded action (open one search; fetch one posting; classify one
   record; extract one posting; resolve company names; append one provenance line) and returns only its
   declared schema (`contracts/schemas.md`).

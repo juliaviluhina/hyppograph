@@ -18,9 +18,11 @@ canonicalisation. All persistent state is plain files under `HYPPO_DATA_DIR`.
 **Delivered in two phases** (see [Phasing](#phasing)):
 
 - **Phase A — prototype as a Claude Code dynamic workflow.** The orchestration is a
-  `.claude/workflows/intake-normalize.js` script (`phase()` / `pipeline()` / `parallel()`); each unit
-  of work is a bounded subagent; HyppoVisor is reached through subagent MCP instructions. Iterated
-  inside a Claude Code session, billed against the plan.
+  `.claude/workflows/intake-normalize.js` script whose top-level body sequences the work with
+  `phase()` markers, serial `for` loops (collect, normalize), and `pipeline()` (triage); each unit of
+  work is a bounded `agent()` subtask whose tool grant comes from a custom `agentType` definition in
+  `.claude/agents/`. HyppoVisor is reached through the collect subagents' MCP tools. Iterated inside a
+  Claude Code session, billed against the plan.
 - **Phase B — optional port to the Claude Agent SDK.** Once the flow is proven, either drive the same
   workflow script from a thin Agent SDK harness via the `Workflow` tool, or rewrite the orchestration
   as plain TypeScript on `@anthropic-ai/claude-agent-sdk` (the constitution's stated stack) to get
@@ -73,19 +75,28 @@ Raw/Job Records accumulating over time.
 ### Phase A — dynamic workflow prototype
 
 **Substrate**: A Claude Code dynamic workflow (`Workflow` tool). Script is constrained JavaScript —
-no `import`, no direct fs/shell from the script body, `Date.now()` / `Math.random()` throw (pass a run
-timestamp via `args`). Orchestration primitives: `phase()`, `pipeline(list, fn)`, `parallel(...)`,
-`agent(prompt, { schema, label })`, `log()`. Caps: ≤ 16 concurrent agents, ≤ 4096 items per
-`pipeline`/`parallel`, ≤ 1000 agents per run.
+no `import`, no direct fs/shell from the script body, `Date.now()` / `Math.random()` / argless
+`new Date()` throw (pass a run timestamp via `args`). The body runs at top level (no default export)
+and finishes with a top-level `return`. Orchestration primitives: `phase(title)` (void marker),
+`pipeline(items, ...stages)` (no options arg; concurrency auto-caps at `min(16, CPUs-2)`),
+`parallel(thunksArray)`, `agent(prompt, { schema, label, model, phase, agentType })`, `log()`. Caps:
+≤ 16 concurrent agents, ≤ 4096 items per `pipeline`/`parallel`, ≤ 1000 agents per run. Because
+`pipeline()` has no concurrency knob, `collect` (drives the user's HyppoVisor session, one source at a
+time) and `normalize` (merges in place into shared Job Record files) are plain serial `for` loops;
+only `triage` (disjoint per-record front-matter writes) uses `pipeline()`.
 
 **Units of work**: Each `agent()` call is one bounded subtask with a task-specific prompt and a JSON
-`schema`. Subagents that touch files use `Read`/`Write`; subagents that fetch pages are instructed to
-call `mcp__hyppovisor__*` read tools. Subagents are restricted via their `tools` list — no subagent
-gets an Edit/Bash/submit capability it doesn't need.
+`schema`. Its tool grant is set by `agentType` — a custom subagent definition under `.claude/agents/`
+(`hyppo-read`, `hyppo-write`, `hyppo-readwrite`, `hyppo-judge`, `hyppo-collect-list`,
+`hyppo-collect-fetch`). There is no per-call `allowedTools`. No definition grants Edit, Bash, a
+submit/send capability, or `mcp__hyppovisor-hyppograph__interact`. (A subagent whose tool list
+resolves to nothing cannot launch, so the pure-judgment `hyppo-judge` is granted a nominal `Read` it
+is instructed never to use.)
 
-**HyppoVisor**: Configured as an MCP server in the Claude Code session (`.mcp.json` or session
-settings) with only its read/navigation tools allow-listed. The `agent()` prompt names the exact tool
-and arguments to call (`contracts/hyppovisor-page-read.md`).
+**HyppoVisor**: Registered as an MCP server in the Claude Code session by the committed `.mcp.json`
+(the per-project named instance `hyppovisor-hyppograph`, literal endpoint, no env vars). Only the six
+read/navigation tools are named — in the `hyppo-collect-*` agent definitions and in
+`contracts/hyppovisor-page-read.md`; the `agent()` prompt names the exact tool and arguments to call.
 
 **Testing**: Manual validation against `tests/fixtures/data-dir/` inside a Claude Code session, plus
 the quickstart scenarios run by hand. No automated CI in this phase.
@@ -120,10 +131,10 @@ subscription/claude.ai-login auth is not permitted for SDK-built products.
 
 | Principle | Phase A (workflow prototype) | Phase B (Agent SDK) | Status |
 |---|---|---|---|
-| **I. Deterministic, Code-Driven Orchestration** | The workflow **script** sequences `phase()` → `pipeline()` → `agent()`; no model decides what runs next. Each `agent()` is a bounded subtask taking a structured payload and returning only its declared schema — state lives in script variables, not in agent context (tasks T011 e). *Looser point, accepted for a prototype:* a subagent runs multiple turns and has some latitude within its task, vs. a `maxTurns: 1` call. | `run.ts` is plain control flow; every judgment is `query({ maxTurns: 1 })` with no tools. No agent loop. | PASS (A: PASS-with-note) |
+| **I. Deterministic, Code-Driven Orchestration** | The workflow **script body** sequences `phase()` markers → serial `for` loops / `pipeline()` → `agent()`; no model decides what runs next. Each `agent()` is a bounded subtask taking a structured payload and returning only its declared schema — state lives in script variables, not in agent context (tasks T011 e). *Looser point, accepted for a prototype:* a subagent runs multiple turns and has some latitude within its task, vs. a `maxTurns: 1` call. | `run.ts` is plain control flow; every judgment is `query({ maxTurns: 1 })` with no tools. No agent loop. | PASS (A: PASS-with-note) |
 | **II. Right-Tier Model Usage** | Every `agent()` that makes a judgment sets `model: "haiku"` (fast tier) explicitly and it is the lowest tier that fits — a shared subagent-policy clause, audited in T041 (tasks T011 d). | `judge({ tier })` wrapper; `config` maps `fast → haiku`. Single audit point. | PASS |
 | **III. Evidence-Backed, Decision-Ready Output** | Normalize subagents keep the Raw Record linked from every Job Record (FR-012) and emit `"unknown"` for unstated fields (FR-010); every `rejected` triage mark carries a reason. Same schemas as Phase B. | Same, enforced by zod schema. | PASS |
-| **IV. The Human Owns the Last Mile** | Session MCP config allow-lists only HyppoVisor read/navigation tools; no subagent is given a submit/send/Edit tool. No outward action anywhere. | `allowedTools` for the MCP `query()` is the HyppoVisor read subset only; unit test asserts no non-read tool is ever listed. | PASS |
+| **IV. The Human Owns the Last Mile** | Each `agent()` names a custom `agentType` whose `.claude/agents/*.md` grants only the tools that step needs; the `hyppo-collect-*` defs list exactly the six HyppoVisor read/navigation tools, and no def anywhere grants `interact`, a submit/send tool, Edit, or Bash. No outward action anywhere. | `allowedTools` for the MCP `query()` is the HyppoVisor read subset only; unit test asserts no non-read tool is ever listed. | PASS |
 | **V. Local Files Are the Only State** | Subagents write only under `HYPPO_DATA_DIR` (paths passed in via the workflow `args`/prompts); append-only provenance; no DB. | `store/` is the only writer, with a path guard refusing anything outside `HYPPO_DATA_DIR`; `settingSources: []` on judgment calls. | PASS |
 | **Architectural Boundaries** | No UI. HyppoVisor via MCP only. Prototype substrate is a Claude Code dynamic workflow — explicitly sanctioned build-time tooling in the constitution's Development Workflow section. | TS on the Claude Agent SDK — the constitution's stated stack. No runtime service, no datastore. | PASS |
 | **Development Workflow** | Spec-driven (`spec.md` → this plan). Prototyping as a dynamic workflow is the sanctioned use of that tooling. | Plan carries this Constitution Check; review checklist maps to FR-018 / FR-010 / tier / provenance. | PASS |
@@ -152,14 +163,21 @@ specs/001-intake-normalize-pipeline/
 
 ```text
 .claude/workflows/
-└── intake-normalize.js          # export const meta + body: phase("collect") / phase("triage") / phase("normalize")
-                                 #   collect:   pipeline(sources, s => agent("open filtered search … then fetch …", {schema}))
-                                 #   triage:    pipeline(rawRecords, r => agent("keep/reject vs hard stops + directions", {schema}))
-                                 #   normalize: pipeline(keptRecords, r => agent("extract fixed field set; unknown if unstated", {schema}))
-                                 #   dedup/canonicalise + write Job Records; append provenance; assemble RunSummary
+└── intake-normalize.js          # export const meta + top-level body: phase("collect"/"triage"/"normalize") markers
+                                 #   collect:   for (src of sources) { agent(open filtered search) ; for (ref) agent(fetch + write Raw Record) }  — serial
+                                 #   triage:    pipeline(rawRecords, r => agent("keep/reject vs hard stops + directions") ; agent(write mark))
+                                 #   normalize: for (rec of keptRecords) { agent("extract fixed field set; unknown if unstated") ; agent(create/merge Job Record) }  — serial
+                                 #   dedup/canonicalise + write Job Records; append provenance; assemble RunSummary; top-level return
 
-.claude/                         # session config for the prototype
-└── (mcp config for hyppovisor, read tools only — .mcp.json or settings)
+.claude/agents/                  # per-agent tool policy (Principle IV) — one custom subagent def each
+├── hyppo-read.md                #   Read
+├── hyppo-write.md               #   Write
+├── hyppo-readwrite.md           #   Read, Write
+├── hyppo-judge.md               #   Read (nominal; pure judgment, no tool use)
+├── hyppo-collect-list.md        #   the six HyppoVisor read/navigation tools
+└── hyppo-collect-fetch.md       #   those six + Write
+
+.mcp.json                        # registers the named instance `hyppovisor-hyppograph` (literal endpoint, no env vars)
 
 tests/fixtures/data-dir/         # synthetic inputs/ + expected outputs/ for manual validation
 ```

@@ -9,14 +9,19 @@ both — run them by hand in Phase A, automated in Phase B.
 
 ## Phase A — run the prototype workflow
 
-1. Configure HyppoVisor as an MCP server in the Claude Code session (`.mcp.json` or session settings),
-   allow-listing only its read/navigation tools.
+1. Launch the project's named HyppoVisor instance and connect it as an MCP server:
+   `open -na HyppoVisor --args --instance hyppograph --port 7359` (probe:
+   `curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:7359/mcp` → `406` = up), then reconnect
+   via `/mcp`. The committed `.mcp.json` registers the server `hyppovisor-hyppograph` with a literal
+   URL — no env vars. Per-agent tool policy (read/navigation only for collect) is enforced by the
+   `.claude/agents/hyppo-*.md` subagent definitions, not by an `allowedTools` list.
 2. Point `HYPPO_DATA_DIR` at `tests/fixtures/data-dir/` (or a small real data dir).
-3. In a Claude Code session, run the workflow: `/intake-normalize` (once saved), or ask Claude to run
-   `.claude/workflows/intake-normalize.js`. Pass the run timestamp via `args` (the workflow clock is
-   frozen).
-4. Watch progress in `/workflows`; when it finishes, check `outputs/job-records/`, `provenance-log.md`,
-   and the printed run summary against the scenarios below.
+3. In a Claude Code session, run the workflow: `/intake-normalize` (once saved via `/workflows` → `s`),
+   or ask Claude to run `.claude/workflows/intake-normalize.js`. Pass the run timestamp via `args` (the
+   workflow clock is frozen).
+4. Watch progress in `/workflows` — the three phases are `collect` / `triage` / `normalize`. When it
+   finishes, check `outputs/job-records/`, `provenance-log.md`, and the printed run summary against the
+   scenarios below.
 5. Re-run against the unchanged data dir and confirm nothing new is written (scenario 8, checked by
    hand in this phase).
 
@@ -26,8 +31,9 @@ both — run them by hand in Phase A, automated in Phase B.
 - A data directory following the README's `inputs/` layout — for local validation use
   `tests/fixtures/data-dir/`
 - Anthropic credentials on the environment (`ant auth login`, or `ANTHROPIC_API_KEY`)
-- For a real run: a reachable HyppoVisor MCP endpoint (`HYPPO_VISOR_MCP_URL` + `HYPPO_VISOR_MCP_TOKEN`).
-  For validation runs, the faked page-read client is used instead (see below).
+- For a real run: the project's HyppoVisor instance running and connected (Phase A step 1 above —
+  `--instance hyppograph --port 7359`, registered by the committed `.mcp.json`). For validation runs,
+  the faked page-read client is used instead (see below).
 
 ## Setup
 
@@ -45,7 +51,10 @@ Key environment variables (defaults in `src/config/index.ts`):
 | `HYPPO_PACING_MS` | `3000` | Delay between posting fetches per source |
 | `HYPPO_FETCH_CAP` | `300` | Max fetches per run |
 | `HYPPO_DEFAULT_DEPTH` | `25` | Depth for a board bullet with no `depth:` |
-| `HYPPO_VISOR_MCP_URL` / `_TOKEN` | — | HyppoVisor page-read endpoint (real runs only) |
+
+HyppoVisor has no env vars in Phase A — the committed `.mcp.json` carries a literal endpoint for the
+named `hyppovisor-hyppograph` instance. (Phase B's Agent SDK harness may reintroduce a configurable
+endpoint.)
 
 ## Run
 
@@ -112,8 +121,11 @@ zero raw records, changes zero triage marks, creates zero Job Records; `provenan
 after the second run.
 
 ### 9. No outward-facing actions — SC-010, FR-018
-Static + runtime check: the MCP `allowedTools` list contains only HyppoVisor read/navigation tool
-names; no test double ever receives a submit/send/apply call. `tests/unit/allowed-tools.spec.ts`.
+Static + runtime check: the collect subagent definitions (`.claude/agents/hyppo-collect-list.md`,
+`hyppo-collect-fetch.md`) grant only the six HyppoVisor read/navigation tools —
+`mcp__hyppovisor-hyppograph__interact` and every submit/send/Edit/Bash capability appear in no
+`hyppo-*.md` file; no test double ever receives a submit/send/apply call. Phase B:
+`tests/unit/allowed-tools.spec.ts`.
 
 ### 10. Throughput — SC-009 (smoke, not in CI gate)
 `npm run pipeline` against a 100-posting fixture with real `HYPPO_PACING_MS=3000`; assert wall-clock
