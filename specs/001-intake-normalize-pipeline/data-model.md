@@ -81,9 +81,9 @@ human-readable body. Written only for RawRecords with `triage.decision === "kept
 
 | Key | Type | Notes |
 |---|---|---|
-| `key` | string | Deterministic identity: slug of `{canonicalCompany, normalizedTitle, locationBucket}` (FR-015) |
+| `key` | string | Deterministic identity: `slug(canonicalCompany)--titleKey(roleTitle)--locationBucket` (FR-015). `titleKey` is a **code** transform (strip parentheticals, a trailing " — Company", leading seniority words) — never the LLM's `normalizedTitle`, which wobbles run-to-run and would split one role into two records |
 | `roleTitle` | string | As stated |
-| `normalizedTitle` | string | Lowercased/canonical form used in `key` and dedup |
+| `normalizedTitle` | string | Lowercased/canonical form — **display only**, not part of `key` |
 | `canonicalCompany` | string | Resolved via CanonicalCompany (FR-014) |
 | `locations` | string[] | Human-readable, as stated; may be `["unknown"]`. **Not** used in `key` |
 | `locationBucket` | string | Coarse dedup key component: `"remote-<region>"` (e.g. `remote-eu`), a `"<city>"`, or `"unknown"`. Collapses board-specific phrasings ("Remote (EU)" / "(Remote, EU)" / "EU-remote" → `remote-eu`) so one role seen on two boards does not split into two Job Records |

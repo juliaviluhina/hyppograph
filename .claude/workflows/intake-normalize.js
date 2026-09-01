@@ -200,7 +200,7 @@ const jobRecordFieldsSchema = {
   ],
   properties: {
     roleTitle: { type: "string" },
-    normalizedTitle: { type: "string" }, // lowercased / canonical form used in the key + dedup
+    normalizedTitle: { type: "string" }, // lowercased canonical form — DISPLAY ONLY; the key's title component is titleKey(roleTitle)
     companyAsStated: { type: "string" }, // resolved to canonical form by the workflow (T034)
     locations: { type: "array", items: { type: "string" } }, // may be ["unknown"] — human-readable, verbatim-ish
     locationBucket: { type: "string" }, // COARSE stable dedup key: "remote-<region>" | "<city>" | "unknown"
@@ -777,7 +777,11 @@ phase("normalize");
         slug(fields.locationBucket) ||
         [...new Set(locs.map((l) => slug(l)).filter(Boolean))].sort().join("_") ||
         "unknown";
-      const key = `${slug(canonicalCompany)}--${slug(fields.normalizedTitle || fields.roleTitle)}--${locKey}`;
+      // Title component of the key is derived DETERMINISTICALLY in code from roleTitle — the judge's
+      // free-form `normalizedTitle` wobbles run-to-run (folds "(Remote, EU)" into the title, strips
+      // "Senior" only sometimes) which silently splits one role into two Job Records. Keep the judge's
+      // normalizedTitle as a display-only field. See titleKey().
+      const key = `${slug(canonicalCompany)}--${titleKey(fields.roleTitle)}--${locKey}`;
 
       // T023 — completeness: low when >=60% of fixed-field values are "unknown", or a core field is missing.
       const coreVals = [
@@ -935,6 +939,18 @@ function stableHash(str) {
     h = (h + ((h << 1) + (h << 4) + (h << 7) + (h << 8) + (h << 24))) >>> 0;
   }
   return "fnv1a:" + h.toString(16).padStart(8, "0");
+}
+
+// Deterministic title component for the dedup key (see the key = ... line in NORMALIZE).
+// Strips parentheticals, a trailing " — Company" / " - Company" tail, and leading seniority words,
+// then slugs. Same real role from two boards ("Senior Platform Engineer" /
+// "Senior Platform Engineer (Remote, EU)") collapses to the same value: "platform-engineer".
+function titleKey(roleTitle) {
+  let t = String(roleTitle || "unknown").toLowerCase();
+  t = t.replace(/\([^)]*\)/g, " "); // drop "(remote, eu)" etc.
+  t = t.replace(/\s+[—–-]\s+.*$/, " "); // drop trailing " — Acme Inc."
+  t = t.replace(/^(?:jr|sr|junior|senior|staff|principal|lead|entry[-\s]?level)\b\.?\s+/i, "");
+  return slug(t) || "unknown";
 }
 
 function slug(s) {
