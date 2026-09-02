@@ -86,6 +86,12 @@ every page read and navigation.
 - This repo is spec-driven via [Spec Kit](https://github.com/github/spec-kit). Every
   feature starts as a spec under `specs/` through the `/speckit-*` skills before
   implementation.
+- Work happens on a branch per spec, named for the spec directory (e.g.
+  `001-intake-normalize-pipeline`), and lands on `main` through a pull request — never
+  a direct push to `main`. `main` is the integration branch and stays releasable. The
+  branch is long-lived for the spec's duration; open a PR at each phase or milestone
+  boundary rather than accumulating one giant PR. Cross-cutting or tooling changes
+  ride the branch of the spec they serve.
 - Implementation tooling: large codebase audits, multi-file migrations, and
   cross-checked research done *while building HyppoGraph* are run as Claude Code
   dynamic workflows — https://code.claude.com/docs/en/workflows. This is a build-time
