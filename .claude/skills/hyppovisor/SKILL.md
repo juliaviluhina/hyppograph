@@ -76,13 +76,26 @@ filled in.
 
 ### 1. Launch this project's instance
 
+Always launch this project's instance **with an explicit name + port and in
+background mode** (`--background`). Rationale: the intake work runs while the user
+is doing other things — a background instance starts hidden and never steals
+focus, so it doesn't disturb them.
+
 ```bash
 # packaged app, macOS  (-n forces a new process)
-open -na HyppoVisor --args --instance hyppograph --port 7359
+open -na HyppoVisor --args --instance hyppograph --port 7359 --background
 
 # or from a HyppoVisor checkout (dev)
-npx electron . --instance hyppograph --port 7359
+npx electron . --instance hyppograph --port 7359 --background
 ```
+
+Every MCP tool works the same in background mode **except `screenshot`**, which
+needs a rendered surface and returns `SCREENSHOT_FAILED` while the window is
+hidden. To sign in past a login wall or to take a screenshot, the user re-runs
+the same `--instance hyppograph` line (no `--background` needed) to **summon** the
+window, does the thing, then closes it — the instance drops back to the
+background and keeps serving MCP on port 7359. Summon-then-close never stops the
+instance; see **Shutting down** below.
 
 The window title reads `HyppoVisor — hyppograph`. If the port is already in use,
 the app's **Connection & MCP** panel shows a "port in use" error — the user frees
@@ -131,7 +144,24 @@ instance — check the port.
 3. In that project: commit a `.mcp.json` with `hyppovisor-<slug>` →
    `http://127.0.0.1:<port>/mcp`, or `claude mcp add --transport http --scope
    local hyppovisor-<slug> http://127.0.0.1:<port>/mcp`.
-4. Launch: `open -na HyppoVisor --args --instance <slug> --port <port>`.
+4. Launch: `open -na HyppoVisor --args --instance <slug> --port <port> --background`.
+
+## Shutting down
+
+A background instance keeps running — and keeps serving MCP on its port — until
+it gets a real quit. Closing a summoned window does **not** stop it.
+
+**If you launched HyppoVisor for this session, ask the user before the session
+ends whether to close it.** If they say yes, give them:
+
+```bash
+# graceful: Ctrl-C in the launch terminal, or for a detached instance
+pkill -f -- "--instance hyppograph "
+# then drop the now-dead endpoint
+claude mcp remove hyppovisor-hyppograph
+```
+
+If they want to keep it running for later work, leave it — nothing to do.
 
 ## Working flow
 
@@ -141,7 +171,9 @@ instance — check the port.
    with per-field `fill` / `click` verdicts and selectors.
 4. `interact` to fill fields, tick plain checkboxes, choose options, or click to
    reveal sections. `wait_for_selector` when content loads async.
-5. `screenshot` to verify what actually rendered.
+5. `screenshot` to verify what actually rendered — **fails with
+   `SCREENSHOT_FAILED` in background mode**; ask the user to summon the window
+   (re-launch the same `--instance hyppograph` without `--background`) first.
 6. Hand back to the user for anything that submits, sends, or signs in.
 
 ## Parallel sessions

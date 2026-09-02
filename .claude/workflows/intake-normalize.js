@@ -550,10 +550,11 @@ phase("triage");
 // Snapshot of the Raw Record archive after collect — index + bodies (Principle V: bodies stay on disk).
 const rawIndex = await agent(
   [
-    `List every *.md file under this directory and, for each, return its path (relative to the data`,
-    `dir root), the front-matter fields id / availability, and the current triage block if present`,
-    `(decision, confidence, criteriaHash). Also return the file's body text.`,
+    `List every *.md file directly under this directory:`,
     `  ${DATA}/outputs/job-records/raw/`,
+    `For each file return: path = the bare file name only (e.g. "raw-foo.md", no directory part),`,
+    `the front-matter fields id / availability, the current triage block if present (decision,`,
+    `confidence, criteriaHash), and the file's body text.`,
     "If the directory is empty or missing, return an empty array.",
   ].join("\n"),
   {
@@ -594,10 +595,23 @@ const rawIndex = await agent(
   }
 );
 
-const rawRecords = rawIndex.records || [];
+// Normalise every returned path to the canonical `outputs/job-records/raw/<basename>` form. The
+// FAST index agent is unreliable about "relative to the data dir root" — it has returned bare
+// basenames (`raw-foo.md`) and dir-relative paths — which then made `${DATA}/${rec.path}` point at
+// a non-existent file and every write-triage silently no-op. The workflow already knows the dir it
+// asked to list, so it owns the path, not the agent.
+const RAW_DIR_REL = "outputs/job-records/raw";
+const rawRecords = (rawIndex.records || []).map((r) => ({
+  ...r,
+  path: `${RAW_DIR_REL}/${String(r.path || "").split("/").pop()}`,
+}));
 
-// Per-record front-matter writes are disjoint, so triage parallelises safely via pipeline().
-await pipeline(rawRecords, async (rec) => {
+// Serial `for` loop, not pipeline(): every record's write-triage AND its appendProvenance run as
+// FAST hyppo-readwrite agents, and appendProvenance does a read-modify-write of the SINGLE shared
+// provenance-log.md. Run concurrently they lose updates (dropped provenance lines) and the FAST
+// writer drops or misroutes front-matter writes under load. collect + normalize are serial for the
+// same class of reason. Pacing in Phase A is serial agent latency anyway (see sleep() note at EOF).
+for (const rec of rawRecords) {
   const thisHash = stableHash(criteriaFingerprint + "\u0000" + (rec.body || ""));
 
   // T029 — recompute only when the criteria hash differs from the stored one (R6).
@@ -606,7 +620,7 @@ await pipeline(rawRecords, async (rec) => {
     else summary.triageRejected++;
     if (rec.triage.confidence === "low") summary.triageLowConfidence++;
     rec._decision = rec.triage.decision;
-    return;
+    continue;
   }
 
   let mark;
@@ -650,8 +664,12 @@ await pipeline(rawRecords, async (rec) => {
   // T029 — write the mark onto the Raw Record FRONT-MATTER only. Never touch the body.
   await agent(
     [
-      `Update ONLY the YAML front-matter of this file — leave the body BYTE-FOR-BYTE unchanged:`,
+      `Update ONLY the YAML front-matter of this EXISTING file — leave the body BYTE-FOR-BYTE unchanged:`,
       `  ${DATA}/${rec.path}`,
+      "",
+      "That exact path already exists. Read it, edit it, write it back to the SAME path. If for any",
+      "reason it is not readable at that path, STOP and report written:false — never create a new",
+      "file at a different path.",
       "",
       "Set the `triage:` key to exactly this block:",
       "triage:",
@@ -686,7 +704,7 @@ await pipeline(rawRecords, async (rec) => {
     how: "pre-triage",
     why: `${mark.decision} — ${mark.reason}` + (mark.confidence === "low" ? " (low confidence)" : ""),
   });
-});
+}
 
 log("triage complete", {
   kept: summary.triageKept,
@@ -777,11 +795,11 @@ phase("normalize");
         slug(fields.locationBucket) ||
         [...new Set(locs.map((l) => slug(l)).filter(Boolean))].sort().join("_") ||
         "unknown";
-      // Title component of the key is derived DETERMINISTICALLY in code from roleTitle — the judge's
-      // free-form `normalizedTitle` wobbles run-to-run (folds "(Remote, EU)" into the title, strips
-      // "Senior" only sometimes) which silently splits one role into two Job Records. Keep the judge's
-      // normalizedTitle as a display-only field. See titleKey().
-      const key = `${slug(canonicalCompany)}--${titleKey(fields.roleTitle)}--${locKey}`;
+      // Every LLM-derived component of the key is re-derived DETERMINISTICALLY in code: the judge's
+      // `normalizedTitle` and the canonicaliser's suffix handling both wobble run-to-run and silently
+      // split or rename Job Records. titleKey()/companyKey() pin them; canonicalCompany + normalizedTitle
+      // stay as display-only front-matter. See titleKey(), companyKey(), c264d28.
+      const key = `${companyKey(canonicalCompany)}--${titleKey(fields.roleTitle)}--${locKey}`;
 
       // T023 — completeness: low when >=60% of fixed-field values are "unknown", or a core field is missing.
       const coreVals = [
@@ -856,12 +874,23 @@ phase("normalize");
           `- [Raw record](./raw/${rec.path.split("/").pop()})`,
           "",
           "STEP 3 — if the target file DOES exist (a duplicate role from another source): do NOT",
-          "create a second file. Append this SourceLink to `sources` if its rawRecordId is not",
-          `already listed:  - { sourceName: <from the raw record>, sourceRef: ${JSON.stringify(rec.id)}, rawRecordId: ${JSON.stringify(rec.id)} }`,
-          "fill any front-matter field whose current value is \"unknown\" from this posting's values",
-          "above, but NEVER overwrite an already-stated value with \"unknown\"; add this line under",
-          `## Sources if not already there:  - [Raw record](./raw/${rec.path.split("/").pop()})`,
-          "Report merged=true.",
+          "create a second file. Make ALL THREE edits below to the existing file, then save it.",
+          "",
+          `  EDIT 1 (front-matter \`sources:\` list) — if no entry there already has`,
+          `  rawRecordId ${JSON.stringify(rec.id)}, append exactly this list item:`,
+          `    - { sourceName: <from the raw record>, sourceRef: ${JSON.stringify(rec.id)}, rawRecordId: ${JSON.stringify(rec.id)} }`,
+          "  If it is already listed, leave `sources:` unchanged.",
+          "",
+          "  EDIT 2 (front-matter \"unknown\" fields) — for each front-matter field whose CURRENT",
+          "  value is \"unknown\", replace it with this posting's value from STEP 2 above when that",
+          "  value is not \"unknown\". NEVER overwrite an already-stated value with \"unknown\".",
+          "",
+          "  EDIT 3 (`## Sources` body section) — if this exact line is not already under the",
+          `  \`## Sources\` heading, append it there as a new bullet:`,
+          `    - [Raw record](./raw/${rec.path.split("/").pop()})`,
+          "",
+          "EDIT 1 and EDIT 3 refer to the same source and must BOTH be applied — never do one and",
+          "skip the other. Report merged=true.",
           "",
           "Return: created (bool), merged (bool), path (relative), alreadyApplied (bool).",
         ].join("\n"),
@@ -951,6 +980,27 @@ function titleKey(roleTitle) {
   t = t.replace(/\s+[—–-]\s+.*$/, " "); // drop trailing " — Acme Inc."
   t = t.replace(/^(?:jr|sr|junior|senior|staff|principal|lead|entry[-\s]?level)\b\.?\s+/i, "");
   return slug(t) || "unknown";
+}
+
+// Deterministic company component for the dedup key. Runs the LLM canon map first (best-effort
+// alias resolution) then strips trailing legal-entity / generic corporate suffixes (Inc, LLC, Ltd,
+// Corp, Corporation, Co, GmbH, AG, PLC, SA, NV, BV, Holdings, Group, Enterprises, …) repeatedly and
+// slugs. The canonicaliser agent is unreliable about suffixes — "Tyrell Corp" one run, "Tyrell" the
+// next; "Globex LLC" left alone — which silently renamed the Job Record file between runs. Same
+// lesson as titleKey() / c264d28. companies.md + canonOf stay DISPLAY-only for the key.
+function companyKey(company) {
+  let c = String(company || "unknown").toLowerCase().replace(/\([^)]*\)/g, " ");
+  let prev;
+  do {
+    prev = c;
+    c = c
+      .replace(
+        /[,.]?\s*\b(?:inc|llc|l\.l\.c|ltd|limited|corp|corporation|co|company|gmbh|ag|plc|s\.?a|n\.?v|b\.?v|oy|ab|holdings?|group|enterprises)\.?\s*$/i,
+        ""
+      )
+      .trim();
+  } while (c !== prev && c.length);
+  return slug(c) || slug(String(company || "")) || "unknown";
 }
 
 function slug(s) {
