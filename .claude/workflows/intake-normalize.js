@@ -292,30 +292,15 @@ if (settings.setupReady !== true) {
   return { ok: false, reason: "setup-not-ready", unresolved: settings.unresolved, summary };
 }
 
-/* ---- Normalise the config into the shapes the stages want ---- */
-const sources = (settings.trackedBoards || []).map((b) => {
-  const depth = Number(b.depth);
-  const badDepth = !Number.isFinite(depth) || depth < 1 || Math.floor(depth) !== depth;
-  const emptySearch = !b.filteredSearch || !String(b.filteredSearch).trim();
-  return {
-    name: b.name || "(unnamed source)",
-    filteredSearch: b.filteredSearch,
-    depth: badDepth ? DEFAULT_DEPTH : depth,
-    configError: emptySearch
-      ? "filteredSearch is empty"
-      : badDepth
-      ? `depth is not a positive integer (${b.depth})`
-      : null,
-  };
-});
+/* ---- Normalise the config into the shapes the stages want ---- *
+ * The pure derivations below are the inlined:intake-core helpers (source of truth in
+ * .claude/workflows/lib/intake-core.mjs, drift-guarded by evals/component/drift.test.mjs). */
+const sources = trackedBoardsToSources(settings.trackedBoards, DEFAULT_DEPTH);
 
 const hs = settings.hardStops || {};
-const effectiveExcludedLocations = [
-  ...foldSet(hs.excludedLocations),
-  ...foldSet(settings.locationsExcluded),
-];
+const excludedLocationsFolded = effectiveExcludedLocations(hs, settings.locationsExcluded);
 const criteria = {
-  excludedLocations: [...new Set(effectiveExcludedLocations)],
+  excludedLocations: [...new Set(excludedLocationsFolded)],
   lackedClearances: [...foldSet(hs.lackedClearances)],
   lackedWorkAuth: [...foldSet(hs.lackedWorkAuth)],
   visaSponsorshipRequired: hs.visaSponsorshipRequired === true,
@@ -325,17 +310,10 @@ const directions = (settings.directions || []).map((d) => ({
   description: d.description,
 }));
 
-const hasHardStops =
-  criteria.excludedLocations.length ||
-  criteria.lackedClearances.length ||
-  criteria.lackedWorkAuth.length ||
-  criteria.visaSponsorshipRequired;
-const noTriageCriteria = !hasHardStops && directions.length === 0; // FR-008d
-summary.noTriageCriteria = noTriageCriteria;
+const noCriteria = noTriageCriteria(criteria, directions); // FR-008d
+summary.noTriageCriteria = noCriteria;
 
-const criteriaFingerprint = stableHash(
-  JSON.stringify({ criteria, directions: directions.map((d) => d.description).sort() })
-);
+const critFingerprint = criteriaFingerprint(criteria, directions);
 
 /* ============================ COLLECT ============================ *
  * Serial `for` loop, not pipeline(): the real pipeline() has no concurrency option, and collect
@@ -359,19 +337,7 @@ phase("collect");
     let opened;
     try {
       opened = await agent(
-        [
-          `Open this user-authored filtered job-board search with the HyppoVisor read tools`,
-          `(open_url / navigate, then read_page; wait_for_selector if the list is lazy-loaded):`,
-          `  ${src.filteredSearch}`,
-          "",
-          `Return up to ${src.depth} posting references FROM THE FILTERED RESULT SET ONLY, in the`,
-          "board's listed order (newest first where supported). Each ref = the canonical posting URL",
-          "plus any list-level metadata the board shows (title/company/date) as listMeta.",
-          "Do NOT follow pagination past what is needed for the requested count. Do NOT click,",
-          "apply, sign in, or submit anything — read and navigate only.",
-          "If the search URL is stale/rejected or the board is unreachable: opened=false with a reason.",
-          "Zero results is opened=true with an empty postingRefs array (not a failure).",
-        ].join("\n"),
+        sourceListPrompt({ filteredSearch: src.filteredSearch, depth: src.depth }), // inlined:prompts
         {
           schema: collectResultSchema,
           label: `open-search:${slug(src.name)}`,
@@ -549,14 +515,7 @@ phase("triage");
 
 // Snapshot of the Raw Record archive after collect — index + bodies (Principle V: bodies stay on disk).
 const rawIndex = await agent(
-  [
-    `List every *.md file directly under this directory:`,
-    `  ${DATA}/outputs/job-records/raw/`,
-    `For each file return: path = the bare file name only (e.g. "raw-foo.md", no directory part),`,
-    `the front-matter fields id / availability, the current triage block if present (decision,`,
-    `confidence, criteriaHash), and the file's body text.`,
-    "If the directory is empty or missing, return an empty array.",
-  ].join("\n"),
+  enumeratePrompt({ rawDir: `${DATA}/outputs/job-records/raw/` }), // inlined:prompts
   {
     schema: {
       type: "object",
@@ -612,7 +571,7 @@ const rawRecords = (rawIndex.records || []).map((r) => ({
 // writer drops or misroutes front-matter writes under load. collect + normalize are serial for the
 // same class of reason. Pacing in Phase A is serial agent latency anyway (see sleep() note at EOF).
 for (const rec of rawRecords) {
-  const thisHash = stableHash(criteriaFingerprint + "\u0000" + (rec.body || ""));
+  const thisHash = stableHash(critFingerprint + "\u0000" + (rec.body || ""));
 
   // T029 — recompute only when the criteria hash differs from the stored one (R6).
   if (rec.triage && rec.triage.criteriaHash === thisHash && rec.triage.decision) {
@@ -624,33 +583,12 @@ for (const rec of rawRecords) {
   }
 
   let mark;
-  if (noTriageCriteria) {
+  if (noCriteria) {
     // T030 — nothing to test against: everything is kept.
     mark = { decision: "kept", reason: "no triage criteria configured", confidence: "normal" };
   } else {
     mark = await agent(
-      [
-        "You are a HIGH-RECALL pre-triage gate. Decide kept / rejected for ONE job posting using",
-        "ONLY the hard stops and the coarse direction overlap below. When unsure, keep it.",
-        "",
-        "HARD STOPS (reject only if the posting clearly triggers one):",
-        JSON.stringify(criteria, null, 2),
-        "  - excludedLocations: reject only if the posting's ONLY location(s) fall in this set.",
-        "  - lackedClearances / lackedWorkAuth: reject if the posting REQUIRES one of these.",
-        "  - visaSponsorshipRequired=true: reject if the posting explicitly offers NO sponsorship.",
-        "",
-        "CONSIDERED DIRECTIONS (coarse 'is this in the ballpark of something I want?'):",
-        directions.map((d) => `  - ${d.name}: ${d.description}`).join("\n") || "  (none configured)",
-        "If there are directions and the posting overlaps NONE of them even loosely, reject with",
-        "reason \"no direction overlap\". If there are no directions, do not reject on that basis.",
-        "",
-        "POSTING TEXT:",
-        (rec.body || "").slice(0, 12000),
-        "",
-        "Return decision, a one-line reason (for kept, name the matched direction or",
-        "\"low-confidence default keep\"), and confidence normal|low. If you cannot classify",
-        "confidently, return decision=kept, confidence=low.",
-      ].join("\n"),
+      preTriagePrompt({ criteria, directions, body: rec.body }), // inlined:prompts
       {
         schema: triageMarkSchema,
         label: `triage:${slug(rec.id)}`,
@@ -710,7 +648,7 @@ log("triage complete", {
   kept: summary.triageKept,
   rejected: summary.triageRejected,
   lowConfidence: summary.triageLowConfidence,
-  noTriageCriteria,
+  noTriageCriteria: noCriteria,
 });
 
 /* =========================== NORMALIZE =========================== *
@@ -762,27 +700,7 @@ phase("normalize");
     // T020/T021/T022/T023/T024/T035/T036/T037/T038 — one Job Record per real role, merge in place.
     for (const rec of kept) {
       const fields = await agent(
-        [
-          "Extract the FIXED FIELD SET from ONE job posting. Rules:",
-          "  - A field the source does NOT state => the literal string \"unknown\". NEVER infer,",
-          "    guess, or convert (no currency conversion, no seniority inference).",
-          "  - salaryAmountOrRange: copy the pay VERBATIM as written, else \"unknown\".",
-          "  - requirements: a list of DISCRETE items, each individually meaningful (FR-011).",
-          "  - Write every field in English. Set originalLanguage to the source posting's language",
-          "    (\"en\" if it was English); if it was not English, translate the extracted values.",
-          "  - normalizedTitle: a lowercased canonical form of roleTitle (strip seniority prefixes",
-          "    only if they are also captured in `seniority`).",
-          "  - locationBucket: a COARSE, STABLE key used for cross-source dedup — NOT a display value.",
-          "    * Remote roles => \"remote-<region>\" where <region> is the lowercased zone the posting",
-          "      implies: remote-eu, remote-us, remote-uk, remote-global. Collapse every phrasing to the",
-          "      same bucket: \"Remote (EU)\", \"EU-remote\", \"Europe, remote\", \"remote within Europe\",",
-          "      \"(Remote, EU)\" => ALL \"remote-eu\".",
-          "    * City/office-anchored roles (on-site or hybrid) => the lowercased primary city: berlin, london.",
-          "    * Nothing stated => \"unknown\".",
-          "",
-          "POSTING TEXT:",
-          (rec.body || "").slice(0, 16000),
-        ].join("\n"),
+        extractionPrompt({ body: rec.body }), // inlined:prompts
         { schema: jobRecordFieldsSchema, label: `normalize:${slug(rec.id)}`, model: FAST, phase: "normalize", agentType: "hyppo-judge" }
       );
 
@@ -797,34 +715,13 @@ phase("normalize");
         "unknown";
       // Every LLM-derived component of the key is re-derived DETERMINISTICALLY in code: the judge's
       // `normalizedTitle` and the canonicaliser's suffix handling both wobble run-to-run and silently
-      // split or rename Job Records. titleKey()/companyKey() pin them; canonicalCompany + normalizedTitle
-      // stay as display-only front-matter. See titleKey(), companyKey(), c264d28.
-      const key = `${companyKey(canonicalCompany)}--${titleKey(fields.roleTitle)}--${locKey}`;
+      // split or rename Job Records. dedupKey()/titleKey()/companyKey() pin them; canonicalCompany +
+      // normalizedTitle stay as display-only front-matter. See intake-core.mjs, c264d28.
+      const key = dedupKey(canonicalCompany, fields.roleTitle, locKey);
 
-      // T023 — completeness: low when >=60% of fixed-field values are "unknown", or a core field is missing.
-      const coreVals = [
-        fields.roleTitle,
-        canonicalCompany,
-        fields.locations && fields.locations.join(","),
-        fields.workArrangement,
-        fields.salaryAmountOrRange,
-        fields.salaryCurrency,
-        fields.seniority,
-        fields.employmentType,
-        fields.postingDate,
-      ];
-      const unknownCount = coreVals.filter(
-        (v) => v === undefined || v === null || String(v).toLowerCase() === "unknown" || v === ""
-      ).length;
-      const requirementsEmpty = !fields.requirements || fields.requirements.length === 0;
-      const completeness =
-        unknownCount / coreVals.length >= 0.6 ||
-        !fields.roleTitle ||
-        fields.roleTitle.toLowerCase() === "unknown" ||
-        canonicalCompany.toLowerCase() === "unknown" ||
-        requirementsEmpty
-          ? "low"
-          : "ok";
+      // T023 — completeness: low when >=60% of fixed-field values are "unknown", or a core field is
+      // missing (completenessLevel() in inlined:intake-core).
+      const completeness = completenessLevel(fields, canonicalCompany);
 
       // Applications link — resolved by the writer against inputs/applications.md (T037).
       const result = await agent(
@@ -957,8 +854,25 @@ log("run summary\n" + rendered, { summary });
 return { ok: true, summary };
 
 /* ------------------------------------------------------------------ *
- * Inline helpers (T009) — hoisted function declarations; no imports in the sandbox
+ * Inline helpers (T009) — hoisted function declarations; no imports in the sandbox.
+ *
+ * The two regions below are GENERATED by copying from the source-of-truth modules
+ * (.claude/workflows/lib/intake-core.mjs and .claude/workflows/lib/prompts.mjs) with
+ * `export ` prefixes removed and any `import` lines dropped — nothing else changes.
+ * DO NOT hand-edit inside the markers. `evals/component/drift.test.mjs` asserts each
+ * region is byte-identical to its module and names the drift on failure (FR-002).
  * ------------------------------------------------------------------ */
+
+/* BEGIN inlined:intake-core — generated from .claude/workflows/lib/intake-core.mjs, do not edit here */
+// intake-core — pure, dependency-free helpers for the intake & normalize pipeline.
+//
+// SOURCE OF TRUTH. `.claude/workflows/intake-normalize.js` carries a marker-delimited
+// inlined copy of this file's body (the sandbox forbids `import`); the module content
+// with `export ` prefixes removed and `import` lines dropped must stay byte-identical
+// to that region. `evals/component/drift.test.mjs` enforces it (FR-002).
+//
+// Contract (contracts/prompt-module.md): no `import`, no I/O, no `Date.now()`,
+// deterministic for a given input.
 
 // Deterministic, dependency-free string hash (FNV-1a, 32-bit) for change-detection only.
 function stableHash(str) {
@@ -970,7 +884,7 @@ function stableHash(str) {
   return "fnv1a:" + h.toString(16).padStart(8, "0");
 }
 
-// Deterministic title component for the dedup key (see the key = ... line in NORMALIZE).
+// Deterministic title component for the dedup key (see dedupKey()).
 // Strips parentheticals, a trailing " — Company" / " - Company" tail, and leading seniority words,
 // then slugs. Same real role from two boards ("Senior Platform Engineer" /
 // "Senior Platform Engineer (Remote, EU)") collapses to the same value: "platform-engineer".
@@ -982,12 +896,10 @@ function titleKey(roleTitle) {
   return slug(t) || "unknown";
 }
 
-// Deterministic company component for the dedup key. Runs the LLM canon map first (best-effort
-// alias resolution) then strips trailing legal-entity / generic corporate suffixes (Inc, LLC, Ltd,
-// Corp, Corporation, Co, GmbH, AG, PLC, SA, NV, BV, Holdings, Group, Enterprises, …) repeatedly and
-// slugs. The canonicaliser agent is unreliable about suffixes — "Tyrell Corp" one run, "Tyrell" the
-// next; "Globex LLC" left alone — which silently renamed the Job Record file between runs. Same
-// lesson as titleKey() / c264d28. companies.md + canonOf stay DISPLAY-only for the key.
+// Deterministic company component for the dedup key. The canonicaliser agent is unreliable about
+// suffixes — "Tyrell Corp" one run, "Tyrell" the next; "Globex LLC" left alone — which silently
+// renamed the Job Record file between runs. Strip trailing legal-entity / generic corporate
+// suffixes repeatedly, then slug. companies.md + canonOf stay DISPLAY-only for the key.
 function companyKey(company) {
   let c = String(company || "unknown").toLowerCase().replace(/\([^)]*\)/g, " ");
   let prev;
@@ -1017,6 +929,68 @@ function slug(s) {
 
 function foldSet(arr) {
   return new Set((arr || []).map((x) => String(x).trim().toLowerCase()).filter(Boolean));
+}
+
+// Dedup key assembly — companyKey--titleKey--locKey. Every LLM-derived component is re-derived
+// DETERMINISTICALLY here: the judge's normalizedTitle and the canonicaliser's suffix handling both
+// wobble run-to-run and silently split or rename Job Records. locKey is derived by the caller from
+// the coarse locationBucket (see intake-normalize NORMALIZE).
+function dedupKey(canonicalCompany, roleTitle, locKey) {
+  return `${companyKey(canonicalCompany)}--${titleKey(roleTitle)}--${locKey || "unknown"}`;
+}
+
+// Criteria fingerprint — a stable hash of the effective hard stops + considered directions.
+// Stored on each triage mark; a change forces re-triage of every Raw Record (R6).
+function criteriaFingerprint(criteria, directions) {
+  return stableHash(
+    JSON.stringify({ criteria, directions: (directions || []).map((d) => d.description).sort() })
+  );
+}
+
+// Union of the hard-stop excludedLocations and the locations-section excluded list, each folded
+// (trimmed + lowercased + de-blanked). Caller de-dups with a Set.
+function effectiveExcludedLocations(hardStops, locationsExcluded) {
+  return [
+    ...foldSet((hardStops || {}).excludedLocations),
+    ...foldSet(locationsExcluded),
+  ];
+}
+
+// FR-008d — no hard stops AND no considered directions => nothing to triage against, keep everything.
+function noTriageCriteria(criteria, directions) {
+  const hasHardStops =
+    criteria.excludedLocations.length ||
+    criteria.lackedClearances.length ||
+    criteria.lackedWorkAuth.length ||
+    criteria.visaSponsorshipRequired;
+  return !hasHardStops && (directions || []).length === 0;
+}
+
+// Completeness level for a Job Record: "low" when >=60% of the fixed core fields are "unknown"/blank,
+// or a core identity field (roleTitle, canonicalCompany) is missing/unknown, or requirements is empty.
+function completenessLevel(fields, canonicalCompany) {
+  const coreVals = [
+    fields.roleTitle,
+    canonicalCompany,
+    fields.locations && fields.locations.join(","),
+    fields.workArrangement,
+    fields.salaryAmountOrRange,
+    fields.salaryCurrency,
+    fields.seniority,
+    fields.employmentType,
+    fields.postingDate,
+  ];
+  const unknownCount = coreVals.filter(
+    (v) => v === undefined || v === null || String(v).toLowerCase() === "unknown" || v === ""
+  ).length;
+  const requirementsEmpty = !fields.requirements || fields.requirements.length === 0;
+  return unknownCount / coreVals.length >= 0.6 ||
+    !fields.roleTitle ||
+    fields.roleTitle.toLowerCase() === "unknown" ||
+    String(canonicalCompany || "").toLowerCase() === "unknown" ||
+    requirementsEmpty
+    ? "low"
+    : "ok";
 }
 
 // provenance-log.md line — one per Raw Record / triage mark / Job Record (contracts/outputs-format.md).
@@ -1075,6 +1049,123 @@ function renderSummary(s) {
   }
   return lines.join("\n");
 }
+
+// tracked-board search configs -> the normalised { name, filteredSearch, depth, configError } shape
+// the collect stage consumes. A bad/absent depth falls back to defaultDepth; an empty filteredSearch
+// is a per-source config error (the source is skipped, the run continues).
+function trackedBoardsToSources(trackedBoards, defaultDepth) {
+  return (trackedBoards || []).map((b) => {
+    const depth = Number(b.depth);
+    const badDepth = !Number.isFinite(depth) || depth < 1 || Math.floor(depth) !== depth;
+    const emptySearch = !b.filteredSearch || !String(b.filteredSearch).trim();
+    return {
+      name: b.name || "(unnamed source)",
+      filteredSearch: b.filteredSearch,
+      depth: badDepth ? defaultDepth : depth,
+      configError: emptySearch
+        ? "filteredSearch is empty"
+        : badDepth
+        ? `depth is not a positive integer (${b.depth})`
+        : null,
+    };
+  });
+}
+/* END inlined:intake-core */
+
+/* BEGIN inlined:prompts — generated from .claude/workflows/lib/prompts.mjs, do not edit here */
+// prompts — the exact agent() prompt text for each model-backed subtask of the intake &
+// normalize pipeline.
+//
+// SOURCE OF TRUTH. `.claude/workflows/intake-normalize.js` carries a marker-delimited
+// inlined copy of this file's body (the sandbox forbids `import`); the module content
+// with `export ` prefixes removed must stay byte-identical to that region.
+// `evals/component/drift.test.mjs` enforces it (FR-002). The per-component evals import
+// these builders directly — never a copy (FR-007).
+//
+// Each export is a `(vars) => string` builder that returns exactly the string the pipeline
+// passes as the first argument to agent().
+
+// Pre-triage keep/reject gate — one posting. vars: { criteria, directions, body }.
+function preTriagePrompt({ criteria, directions, body }) {
+  return [
+    "You are a HIGH-RECALL pre-triage gate. Decide kept / rejected for ONE job posting using",
+    "ONLY the hard stops and the coarse direction overlap below. When unsure, keep it.",
+    "",
+    "HARD STOPS (reject only if the posting clearly triggers one):",
+    JSON.stringify(criteria, null, 2),
+    "  - excludedLocations: reject only if the posting's ONLY location(s) fall in this set.",
+    "  - lackedClearances / lackedWorkAuth: reject if the posting REQUIRES one of these.",
+    "  - visaSponsorshipRequired=true: reject if the posting explicitly offers NO sponsorship.",
+    "",
+    "CONSIDERED DIRECTIONS (coarse 'is this in the ballpark of something I want?'):",
+    (directions || []).map((d) => `  - ${d.name}: ${d.description}`).join("\n") || "  (none configured)",
+    "If there are directions and the posting overlaps NONE of them even loosely, reject with",
+    "reason \"no direction overlap\". If there are no directions, do not reject on that basis.",
+    "",
+    "POSTING TEXT:",
+    (body || "").slice(0, 12000),
+    "",
+    "Return decision, a one-line reason (for kept, name the matched direction or",
+    "\"low-confidence default keep\"), and confidence normal|low. If you cannot classify",
+    "confidently, return decision=kept, confidence=low.",
+  ].join("\n");
+}
+
+// Fixed-field-set extraction — one posting. vars: { body }.
+function extractionPrompt({ body }) {
+  return [
+    "Extract the FIXED FIELD SET from ONE job posting. Rules:",
+    "  - A field the source does NOT state => the literal string \"unknown\". NEVER infer,",
+    "    guess, or convert (no currency conversion, no seniority inference).",
+    "  - salaryAmountOrRange: copy the pay VERBATIM as written, else \"unknown\".",
+    "  - requirements: a list of DISCRETE items, each individually meaningful (FR-011).",
+    "  - Write every field in English. Set originalLanguage to the source posting's language",
+    "    (\"en\" if it was English); if it was not English, translate the extracted values.",
+    "  - normalizedTitle: a lowercased canonical form of roleTitle (strip seniority prefixes",
+    "    only if they are also captured in `seniority`).",
+    "  - locationBucket: a COARSE, STABLE key used for cross-source dedup — NOT a display value.",
+    "    * Remote roles => \"remote-<region>\" where <region> is the lowercased zone the posting",
+    "      implies: remote-eu, remote-us, remote-uk, remote-global. Collapse every phrasing to the",
+    "      same bucket: \"Remote (EU)\", \"EU-remote\", \"Europe, remote\", \"remote within Europe\",",
+    "      \"(Remote, EU)\" => ALL \"remote-eu\".",
+    "    * City/office-anchored roles (on-site or hybrid) => the lowercased primary city: berlin, london.",
+    "    * Nothing stated => \"unknown\".",
+    "",
+    "POSTING TEXT:",
+    (body || "").slice(0, 16000),
+  ].join("\n");
+}
+
+// Raw Record enumeration — index every *.md directly under the raw/ dir. vars: { rawDir }.
+function enumeratePrompt({ rawDir }) {
+  return [
+    `List every *.md file directly under this directory:`,
+    `  ${rawDir}`,
+    `For each file return: path = the bare file name only (e.g. "raw-foo.md", no directory part),`,
+    `the front-matter fields id / availability, the current triage block if present (decision,`,
+    `confidence, criteriaHash), and the file's body text.`,
+    "If the directory is empty or missing, return an empty array.",
+  ].join("\n");
+}
+
+// Source list — open one user-authored filtered board search and return its posting refs.
+// vars: { filteredSearch, depth }.
+function sourceListPrompt({ filteredSearch, depth }) {
+  return [
+    `Open this user-authored filtered job-board search with the HyppoVisor read tools`,
+    `(open_url / navigate, then read_page; wait_for_selector if the list is lazy-loaded):`,
+    `  ${filteredSearch}`,
+    "",
+    `Return up to ${depth} posting references FROM THE FILTERED RESULT SET ONLY, in the`,
+    "board's listed order (newest first where supported). Each ref = the canonical posting URL",
+    "plus any list-level metadata the board shows (title/company/date) as listMeta.",
+    "Do NOT follow pagination past what is needed for the requested count. Do NOT click,",
+    "apply, sign in, or submit anything — read and navigate only.",
+    "If the search URL is stale/rejected or the board is unreachable: opened=false with a reason.",
+    "Zero results is opened=true with an empty postingRefs array (not a failure).",
+  ].join("\n");
+}
+/* END inlined:prompts */
 
 /* appendProvenance — one line, append-only, to provenance-log.md (Principle V).
  * `phaseName` only steers the /workflows progress grouping. */

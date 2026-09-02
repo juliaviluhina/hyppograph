@@ -33,13 +33,13 @@ Single project. Harness under `evals/` at repo root; shared source-of-truth modu
 
 **Purpose**: skeleton so every later task has a place to write.
 
-- [ ] T001 Create `package.json` (repo root) — `"private": true`, `"type": "module"`, scripts
+- [X] T001 Create `package.json` (repo root) — `"private": true`, `"type": "module"`, scripts
   `"test": "node --test evals/component/"` and `"eval": "node evals/run.mjs"`, **no** runtime deps
   (research D9); and create the empty `evals/` tree: `evals/component/`, `evals/per-component/fixtures/`,
   `evals/per-component/rubrics/`, `evals/integration/`, `evals/lib/`.
-- [ ] T002 [P] Edit `.env.example` — add the judge credential placeholder name (name only, no value);
+- [X] T002 [P] Edit `.env.example` — add the judge credential placeholder name (name only, no value);
   leave a commented placeholder for the future metered-substrate credential (FR-017).
-- [ ] T003 [P] Create `docs/eval-reports/README.md` with the empty ledger table header
+- [X] T003 [P] Create `docs/eval-reports/README.md` with the empty ledger table header
   `| NNNN | date | scope | result | cost | commit |` and a one-paragraph "how to read this" note
   (contract: `contracts/eval-report.md`).
 
