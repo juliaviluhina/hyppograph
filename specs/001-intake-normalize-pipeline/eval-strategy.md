@@ -38,11 +38,15 @@ needed 89 agents to find, yet the 89-agent run was the only instrument we had. B
 - Give Phase A a real pass/fail gate instead of eyeballing a summary.
 - Fold in the two open validation items: 7d idempotency (SC-006) and 7e live smoke.
 - Produce reusable eval infrastructure that carries into Phase B (plan.md § Phasing "Carried over A→B").
+- Produce **committed eval evidence** — a dated report per run (§9) — as a portfolio artifact: the
+  "nice to have on a real project" that shows methodology, coverage, results, and cost transparency.
 
 **Non-goals**
 - Testing model *quality* of downstream (mid/top-tier) steps — out of scope for feature 001.
 - Replacing the manual quickstart walkthrough entirely in Phase A — the golden run supplements it.
-- CI wiring in Phase A (Phase B concern).
+- **Any automated / triggered run.** No GitHub Actions, no push/PR hooks, no scheduled runs — every
+  metered run is started by the user, by hand (§6.3). CI is deferred indefinitely, not just past
+  Phase A.
 
 ## 3. The three-tier pyramid
 
@@ -154,7 +158,7 @@ fixture **once with usage logging** to replace the ±2× estimate with a measure
 | Option | Billing | Portfolio value | Notes |
 |--------|---------|-----------------|-------|
 | **`Workflow` tool in Claude Code** (current) | subscription / plan tokens | low | Already an Agent-SDK-backed runner. Tier 3 + 7e run here for ~$0 to the user. |
-| **Standalone `@anthropic-ai/claude-agent-sdk` harness** | `ANTHROPIC_API_KEY` (pay-per-token); the `ant auth login` profile can draw on the subscription but is rate-limited and not meant for batch eval loops | high — demonstrable eval infra | This is Phase B option **B2**. Only justified now if the portfolio evidence is worth ~$10–20 of API spend. |
+| **Standalone `@anthropic-ai/claude-agent-sdk` harness** | a stored API credential, pay-per-token (handling: §6.2) | high — demonstrable eval infra | Phase B option **B2**. Runs **locally, manually only** (§6.3). Justified only if the portfolio evidence is worth ~$10–20 of metered spend. |
 
 Tier 1 is substrate-independent (plain Node). Tier 2/3 can run either place; default to the `Workflow`
 tool until/unless B2 is chosen.
@@ -181,13 +185,13 @@ already-paid plan) or to *no model at all* (a mock).
    of times (plan tokens). API spend so far: $0. GPT Luna judge wired here too (off the Anthropic meter).
 4. **CREDITS CHECKPOINT — stop and ask the user to buy Claude API credits.** This is the *first and
    only* point real money is committed. Reached only when steps 1–3 are green **and** the user has
-   chosen to go to B2 (CI / reproducibility / the portfolio artifact — §7 decision 5). Ask for a
+   chosen to go to B2 (reproducibility + the portfolio artifact — §7 decision 5). Ask for a
    **~$25 top-up** (§5 budget: worst case ~$24 for the pyramid path; ~$40–50 if harness iteration is
    heavy). Do **not** start step 5 until the user confirms the credits are purchased. If B2 is *not*
    chosen, the sequence ends at step 3 and nothing is metered.
-5. **Port to standalone Agent SDK + API key + Haiku** — metered runs start here, on runs that matter:
-   the CI gate, reproducibility checks, the portfolio artifact. Re-lock `expected/` fixtures once for
-   harness drift (see caveat below).
+5. **Port to the standalone Agent SDK harness (Haiku)** — metered runs start here, run **locally and
+   by hand** (§6.3), on runs that matter: reproducibility checks and the portfolio artifact. Re-lock
+   `expected/` fixtures once for harness drift (see caveat below). Each run writes a report (§9).
 
 Realistic outcome: **$0** if the sequence ends at step 3; **$0–5** of a $25 top-up if B2 is chosen and
 only the final gate is metered; up to ~$25 if harness iteration is heavy.
@@ -195,9 +199,45 @@ only the final gate is metered; up to ~$25 if harness iteration is heavy.
 **Caveat — harness drift, not model drift.** Same `claude-haiku-4-5` weights, but the `Workflow` tool
 wraps them in Claude Code's harness + the `.claude/agents/*.md` defs, while a standalone Agent SDK
 harness has its own system prompt and a reconstructed agent config. Expect a **light re-lock of the
-`expected/` fixtures** when porting substrate at step 4 — behavioural, from the harness, not the model.
+`expected/` fixtures** when porting substrate at step 5 — behavioural, from the harness, not the model.
 The `agentType` / prompt / schema text is carried over (plan.md § Phasing "Carried over A→B"); the
 surrounding harness is not.
+
+### 6.2 Secrets handling
+
+Credentials (the Anthropic API credential for B2, any GPT Luna credential for the judge) are handled,
+not documented into the repo:
+
+- **Storage** — outside the repo tree: an OS keychain, a `direnv`/shell profile the repo doesn't
+  track, or a `.env` that is gitignored and never committed. The repo carries only a `.env.example`
+  with placeholder names, no values. No credential value appears in any spec, doc, or fixture.
+- **Logging** — the harness must never print a credential, a request header, or a full request body.
+  Eval reports (§9) record model **IDs** and token **counts**, never auth material.
+- **Provenance / evidence** — Principle V's "not in logs or telemetry" extends to credentials:
+  nothing under `provenance-log.md` or the eval reports may contain one.
+- The harness reads its credential from the environment at start and fails fast with a clear message
+  if it is absent — it never prompts for one interactively or accepts one as a CLI argument.
+
+### 6.3 Run control — no CI, manual only
+
+Metered runs must stay fully under the user's hand. There is **no GitHub Actions workflow**, no
+push/PR hook, no scheduled job — deferred indefinitely, not just past Phase A. Rationale: an
+automated trigger can spend real money on a run the user did not initiate and cannot easily stop.
+
+Controls instead:
+
+- **Free tier is the only thing that ever runs unattended.** Tier 1 (`node --test`) is pure code, $0,
+  and *may* be wired to a pre-commit hook or a plain `make test` — it touches no model.
+- **Every metered run is one explicit command** the user types, e.g.
+  `node evals/run.mjs golden --confirm-spend`. Without `--confirm-spend` the harness prints the
+  estimated cost and exits 0 without calling the API.
+- **Hard spend guard in the harness.** A per-run cap (token or dollar) that aborts the run if
+  exceeded — a bug in a loop can't quietly rack up spend.
+- **Every metered run is logged** to the eval report set (§9), so spend is always reconstructable
+  after the fact.
+- *If* a controlled trigger is ever wanted, the elegant form is a manual-dispatch-only job
+  (`workflow_dispatch`, never `on: push`) with a spend-cap secret and a required confirmation input —
+  but that is explicitly out of scope here.
 
 ## 7. Open decisions
 
@@ -205,6 +245,10 @@ surrounding harness is not.
 - **LLM-as-judge is non-Claude — GPT Luna.** Never a Claude model for the judge role. See §4.
 - **Money is committed at one point only** — the §6.1 step-4 credits checkpoint, and only if B2 is
   chosen. Steps 1–3 spend $0.
+- **No CI / no automated runs** (§6.3). Deferred indefinitely. Only Tier 1 (free) may run unattended;
+  every metered run is one explicit user command with a spend guard.
+- **Secrets** (§6.2) — stored outside the repo, never logged, never in reports or provenance.
+- **Eval evidence is committed** as dated reports (§9) — the portfolio artifact.
 
 **Still open:**
 
@@ -218,9 +262,12 @@ surrounding harness is not.
 4. **`package.json`** — add one for `node --test`, or keep the repo build-tool-free and invoke tests
    ad hoc? Tier 1 needs no deps either way.
 5. **Portfolio call** — build the standalone Agent SDK harness now (parallel to Phase A validation),
-   or after Phase A sign-off (it is literally Phase B / B2)?
+   or after Phase A sign-off (it is literally Phase B / B2)? This is the trigger for the §6.1 step-4
+   credits checkpoint.
 6. **Sequencing** — Tier 1 + Tier 3 first (they directly unblock finishing Phase A), Tier 2 after;
    or all three before any more workflow runs?
+7. **Report location** — `docs/eval-reports/` (recommended — evidence, not spec), or under
+   `specs/001-intake-normalize-pipeline/eval-runs/` to keep it beside this doc? See §9.
 
 ## 8. Relationship to existing tasks
 
@@ -228,4 +275,29 @@ surrounding harness is not.
 - **T047** (Phase A exit review) — the golden run + Tier 1 green become inputs to the exit review;
   record "eval pyramid stood up" and the B1/B2 decision there.
 - **plan.md § Phasing "Tests" row** — Phase A gains: Tier 1 unit + Tier 3 golden integration + manual
-  quickstart. Phase B "Tests" row (vitest unit + integration, CI) is Tier 1/2/3 ported onto B2's stack.
+  quickstart. Phase B "Tests" row (vitest unit + integration) is Tier 1/2/3 ported onto B2's stack —
+  **CI deferred indefinitely** (§6.3), against the constitution's default Phase B expectation; the
+  justification (no runs outside the user's control) is recorded here and belongs in the T047 review.
+
+## 9. Eval evidence & reporting
+
+Every eval run — free or metered, `Workflow`-tool or standalone harness — emits a **dated report**.
+Committed, human-readable, synthetic-data-only (safe in this repo). This is the portfolio artifact:
+what a real project keeps to show its testing was real.
+
+- **Location** (open decision §7.7) — recommended `docs/eval-reports/`, one file per run:
+  `NNNN-YYYY-MM-DD-<scope>.md` (`<scope>` = `tier1` | `tier2-<agent>` | `golden` | `golden-idem` |
+  `live-smoke`), plus a `README.md` index table (date, scope, result, cost, commit).
+- **Report contents** — enough to reproduce and to judge coverage:
+  - *Methodology* — which tier, the 3-tier pyramid context, the cross-model (GPT Luna) judge for
+    any fuzzy checks.
+  - *Under test* — workflow commit SHA, model IDs (`claude-haiku-4-5`, the Luna judge ID), fixture
+    directory + a hash of it, run timestamp / run id.
+  - *Results* — per-case pass/fail table; for failures, the actual-vs-expected diff.
+  - *Cost* — token counts in/out and derived dollar cost (0 for Tier 1 / plan-billed runs; the real
+    figure for metered runs). This is where the ±2× estimate in §5 gets replaced with measurement.
+  - *Findings* — any bug caught, linked to a fix commit; any `expected/` re-lock and why.
+- **Index doubles as the spend ledger** — every metered run appears with its cost, so total API spend
+  is always reconstructable (ties to the §6.3 controls).
+- **Generation** — the harness writes the report as its last step; a `Workflow`-tool run's report is
+  assembled by hand from the run summary until/unless the harness exists.
