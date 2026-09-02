@@ -142,6 +142,10 @@ second pass adds no files and leaves `provenance-log.md` byte-identical.
   byte-identical (FR-005, feature 001 SC-006); reported as scope `integration-idem`.
 - [ ] T021 [US2] Wire the `integration` layer into `evals/run.mjs` — run `gate.mjs` then
   `idempotency.mjs`, assert no network access occurred during either pass (FR-006), honour `--scratch`.
+  The no-network assertion MUST be an active failure condition (any outbound connection attempt during
+  a pass fails the layer and names the fixture/URL that reached out), so a hermeticity breach is
+  *caught*, not merely absent — this is the eval-layer that covers SC-002's "a fixture reaching the
+  live internet" class.
 - [ ] T022 [US2] Add the `live-smoke` path to `evals/run.mjs` — shallow real run against a HyppoVisor
   board search, `--scratch` **outside the repo**, requires `--confirm-spend`, output hand-judged
   (US2 scenario 4; contract: `contracts/evals-cli.md`).
@@ -149,7 +153,9 @@ second pass adds no files and leaves `provenance-log.md` byte-identical.
   expected tree (behaviour unchanged) and record the one-time expected-tree lock in the report's
   *Findings* (FR-019, edge case "substrate change").
 - [ ] T024 [US2] Run the Independent Test above; confirm SC-003 (exact match + byte-identical
-  provenance on the second pass).
+  provenance on the second pass). Also confirm SC-002's fixture-hygiene class: point one synthetic
+  tracked search at a resolving host, run `integration`, confirm the layer fails and names the
+  offending fixture; revert to the `*.invalid` host and confirm green.
 
 **Checkpoint**: deterministic integration gate replaces the eyeballed full-run loop.
 
@@ -178,8 +184,10 @@ credential patterns is clean; no `.github/workflows/` runs a non-`component` lay
   `--substrate metered` while the standalone substrate is unbuilt → exit 2 pointing at the FR-023
   milestone (contract: `contracts/evals-cli.md`).
 - [ ] T028 [US3] Add a guard that `evals/` never overrides the system-under-test tier — no code path
-  sets a non-fast model or rewrites `HYPPO_MODEL_FAST`; assert `claude-haiku-4-5` stays the SUT model
-  (FR-009).
+  sets a non-fast model or rewrites `HYPPO_MODEL_FAST`; assert the effective SUT model id still
+  matches the fast-tier family `claude-haiku-4-5` by prefix/normalized compare (the deployed value
+  carries a date suffix, e.g. `claude-haiku-4-5-20251001` in `.env.example`) — not an exact-string
+  equality (FR-009).
 - [ ] T029 [US3] Confirm and document the no-unattended-metered rule — verify absence of
   `.github/workflows/`, scheduled jobs, and push hooks running any layer but `component`; document
   that only `npm test` (→ `component`) may be wired into a pre-commit hook (FR-018, Complexity
