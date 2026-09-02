@@ -12,6 +12,23 @@ own feature: a layered eval harness that catches component defects cheaply, gate
 known-good synthetic example, keeps model choice and spend under explicit human control, and produces
 committed eval evidence.
 
+## Clarifications
+
+### Session 2026-09-02
+
+- Q: Should the integration-gate dataset be a fresh ~8-posting synthetic set or a trimmed copy of the
+  existing 16-record feature-001 fixture? → A: A — author a fresh synthetic set (~8 postings), one per
+  known failure mode; leave `tests/fixtures/data-dir/` unchanged for occasional full runs.
+- Q: Should feature 001's inline agent prompts be moved to a shared module the per-component evals can
+  read, accepting an edit to the committed workflow file? → A: A — yes; extract the pipeline's agent
+  prompts into a shared module consumed by both the workflow and the evals.
+- Q: Which assertions may the non-Claude model judge grade, with everything else deterministic? → A: B
+  — extraction faithfulness and pre-triage reason soundness only, each graded against an explicit
+  written criteria list (rubric); all other assertions (counts, keys, dedup outcome, enumeration,
+  vocabulary membership, byte-equality) are deterministic.
+- Q: Where should the committed eval reports and their index live? → A: A — `docs/eval-reports/`, a
+  project-level directory, one file per run plus an index.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Catch a component defect without a full pipeline run (Priority: P1)
@@ -196,10 +213,12 @@ table, and a cost figure (zero for the free layer). The index gains a row.
 - **FR-002**: Where pipeline helper logic must exist both as a shared unit and as an inlined copy
   demanded by the orchestration substrate, the harness MUST include a check that fails when the two
   diverge.
-- **FR-003**: The harness MUST provide a **synthetic integration dataset** and a committed
-  **expected-output tree** (Job Records, company canonicalisation, run summary counts, provenance
-  lines) small enough that every expected value is known in advance, and covering one instance each of
-  every failure mode observed to date.
+- **FR-003**: The harness MUST provide a **newly authored synthetic integration dataset** (~8
+  postings, one instance each of every failure mode observed to date, plus a manual-drop file and a
+  non-posting file) and a committed **expected-output tree** (Job Records, company canonicalisation,
+  run summary counts, provenance lines) small enough that every expected value is known in advance.
+  The existing 16-record `tests/fixtures/data-dir/` fixture is left unchanged and remains available
+  for occasional full runs; it is not the integration-gate dataset.
 - **FR-004**: The integration check MUST run the full collect→triage→normalize flow over a scratch
   copy of the synthetic dataset and report every deviation from the expected tree as a file-level
   diff.
@@ -210,23 +229,34 @@ table, and a cost figure (zero for the free layer). The index gains a row.
   resolves to nothing, the corpus is pre-seeded synthetic records.
 - **FR-007**: The harness MUST provide **per-component evals** for the model-backed subtasks
   (pre-triage keep/reject, field extraction, record enumeration, source-list parsing), each asserting
-  on that subtask's structured output in isolation against a fixture table.
+  on that subtask's structured output in isolation against a fixture table, using the **exact prompt
+  the pipeline uses** — not a copy.
+- **FR-007a**: The intake & normalize pipeline's inline agent prompt text MUST be moved into a shared
+  module that both the pipeline workflow and the per-component evals consume, so FR-007 tests real
+  behaviour without prompt duplication. This edit to feature 001's workflow file is in scope for this
+  feature.
 - **FR-008**: Per-component evals for values that feed deterministic downstream keys MUST assert
   **stability across repeated runs**, not a single sample.
 - **FR-009**: The **system under test** — the pipeline's in-step model calls — MUST remain on the
   fast tier, per constitution Principle II. Evals MUST NOT alter the tier of the system under test.
-- **FR-010**: The **judge role** — any model-graded assertion for checks that cannot be expressed
-  deterministically — MUST use a non-Claude model. Deterministic checks (structural comparison, schema
-  validation, keyword presence) MUST be preferred wherever they suffice; a model judge is used only
-  for the genuinely fuzzy remainder.
-- **FR-011**: Every eval run MUST emit a **dated report** containing: which layer ran, methodology,
-  the pipeline version identifier, the model identifiers used, a fixture identifier, a per-case
-  pass/fail table, failure diffs where present, and a cost figure (zero for free layers).
+- **FR-010**: The **judge role** MUST use a non-Claude model and MUST be limited to exactly two
+  assertion types: (1) extraction faithfulness — does the extracted Job Record faithfully represent
+  the source posting; (2) pre-triage reason soundness — is the keep/reject reason sound given the
+  posting and the configured criteria. Every other assertion (record counts, dedup keys, dedup
+  outcome, record enumeration, vocabulary membership, byte-equality, provenance stability) MUST be
+  deterministic.
+- **FR-010a**: Each judge-graded assertion type MUST be graded against an **explicit written criteria
+  list (rubric)** stored with the eval; the judge is given the rubric and returns a pass/fail per
+  criterion, not an open-ended opinion.
+- **FR-011**: Every eval run MUST emit a **dated report** under `docs/eval-reports/` (one file per
+  run) containing: which layer ran, methodology, the pipeline version identifier, the model
+  identifiers used, a fixture identifier, a per-case pass/fail table, failure diffs where present,
+  and a cost figure (zero for free layers).
 - **FR-012**: Eval reports MUST be committed to the repository, human-readable, and contain only
   synthetic data, model identifiers, and token counts — never credentials, auth headers, request
   bodies, or personal data.
-- **FR-013**: The harness MUST maintain a **report index** that lists every run with date, scope,
-  result, and cost, such that total metered spend is reconstructable from it.
+- **FR-013**: The harness MUST maintain a **report index** at `docs/eval-reports/` that lists every
+  run with date, scope, result, and cost, such that total metered spend is reconstructable from it.
 - **FR-014**: Any eval run that incurs metered cost MUST require an **explicit per-invocation
   confirmation**; without it, the command prints an estimate and exits without any paid call.
 - **FR-015**: The harness MUST enforce a **per-run spend ceiling** that aborts the run before it is
