@@ -219,7 +219,7 @@ Phase B realises them as modules + `query()`. Porting A→B is re-housing known 
 |---|---|---|
 | Goal | Prove the collect→triage→normalize flow end-to-end on real postings, cheaply and interactively | Testable, CI-gated, reproducible implementation on the constitution's stack |
 | Substrate | `.claude/workflows/intake-normalize.js` + Claude Code session | B1: SDK `Workflow` tool wrapping the same script · B2: plain TS on `@anthropic-ai/claude-agent-sdk` |
-| Tests | Manual, quickstart scenarios by hand | `vitest` unit + integration, SC-006 re-run assertion, CI |
+| Tests | Tier 1 pure-code unit (`node:test`) + Tier 3 golden synthetic integration run + manual quickstart — see [eval-strategy.md](./eval-strategy.md) | Tier 1/2/3 ported onto B2's stack: `vitest` unit + integration, SC-006 re-run assertion, CI |
 | Billing | Plan / subscription (Claude Code session) | API key |
 | Exit criteria | Quickstart scenarios 1–9 pass by hand against fixtures; one real run against a small live `settings.json` produces correct Job Records + provenance + summary; the `setupReady: false` precondition exit works; SC-007/SC-008 spot-checked | All quickstart scenarios automated and green; SC-006 idempotency test passes; `judge()` + `mcp/` behind interfaces with fixture fakes |
 | Carried over A→B | Spec, data model, all `contracts/`, the JSON schemas used in `agent()` calls, prompt text, fixtures, the step decomposition | — |
