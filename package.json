@@ -1,0 +1,10 @@
+{
+  "private": true,
+  "type": "module",
+  "name": "hyppograph",
+  "description": "Build-time developer tooling for HyppoGraph — the pipeline eval harness (feature 003).",
+  "scripts": {
+    "test": "node --test evals/component/",
+    "eval": "node evals/run.mjs"
+  }
+}
