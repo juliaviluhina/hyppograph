@@ -439,6 +439,9 @@ the corresponding named outcome from the fixed vocabulary in every case, never f
 - **SC-013**: A person unfamiliar with this feature can bootstrap a working data directory by
   copying the committed settings template and editing it, without reading the schemas or fixtures
   first.
+- **SC-014**: A run that verifies 100 non-terminal Job Records and scores the confirmed-open/
+  unresolvable subset completes end-to-end within 30 minutes, configured pacing included (resolved
+  during `/speckit-plan`, mirroring feature 001's SC-009 for this feature's own step boundary).
 
 ## Dependencies
 
