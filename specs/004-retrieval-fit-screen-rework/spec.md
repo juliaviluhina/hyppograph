@@ -39,6 +39,25 @@ from."
   mid-run question to the user; a Job Record that cannot be scored gets a named outcome and the
   run continues to the next record.
 
+### Session 2026-09-12 (continued)
+
+- Q: What are the allowed values for the overall fit verdict, and for each required-item's per-row
+  verdict? → A: Adopt the reference rubric's exact scale verbatim (`hyppoplugins/plugins/job-search`
+  `job-fit-screen/references/rubric.md`) — per required-item row: `Strong` / `Partial` / `Fails` /
+  `Absent` / `Unknown`; overall verdict: `SKIP` / `APPLY-AND-SEE` / `APPLY`. Hard constraints get
+  their own three-value state — pass / fail / `unresolved` — distinct from both scales, per the
+  rubric's own terminology.
+- Q: When a Job Record's open-status was already marked `confirmed-open` on a previous run, does a
+  later run re-check it, or is the mark permanent once set? → A: Re-check `confirmed-open` and
+  `unresolvable` records on every run (cheap, stateless ATS-API signal); `confirmed-closed` is
+  terminal and is never re-checked. "Idempotent" (FR-009/SC-009) means zero *changed* marks and zero
+  duplicate writes when nothing actually changed — not that the check itself skips already-marked
+  records.
+- Q: Should the repeated ATS posting-API re-checks (FR-002c) be paced or capped, the way feature
+  001 paces board collection? → A: Yes — reuse feature 001's existing per-source pacing mechanism
+  (configurable minimum delay + per-run fetch cap, `FR-006a`), extended to cover this feature's
+  re-check calls, rather than defining a second pacing config.
+
 ## User Scenarios & Testing *(mandatory)*
 
 These are the next two ordered steps of the HyppoGraph pipeline after feature 001: verifying a
@@ -52,15 +71,15 @@ outward-facing action.
 
 For each kept, verified Job Record, the system scores every required qualification against the
 user's evidence base — not a title match, not a vibe check. Each required item gets an explicit,
-cited verdict (met / partially met / not met / unknown) referencing the specific evidence-file
-section it rests on. Separately, the record is checked against hard constraints (minimum
-compensation, disallowed locations, required clearance or work authorization the user lacks,
-excluded role natures) that can fail a role outright regardless of qualification fit. A handful of
-known failure patterns are checked explicitly: claiming credit for adjacent-but-different domain
-experience, a title that outruns the actual requirements, and evidence that is old enough that a
-"leadership" or "mentoring" requirement should be discounted rather than taken at face value.
-The output is a fit verdict on a fixed scale, with every required item's row visible and every
-claim traceable to its evidence.
+cited verdict (`Strong` / `Partial` / `Fails` / `Absent` / `Unknown`) referencing the specific
+evidence-file section it rests on. Separately, the record is checked against hard constraints
+(minimum compensation, disallowed locations, required clearance or work authorization the user
+lacks, excluded role natures) that can fail a role outright regardless of qualification fit. A
+handful of known failure patterns are checked explicitly: claiming credit for adjacent-but-different
+domain experience, a title that outruns the actual requirements, and evidence that is old enough
+that a "leadership" or "mentoring" requirement should be discounted rather than taken at face value.
+The output is one overall fit verdict — `SKIP` / `APPLY-AND-SEE` / `APPLY` — with every required
+item's row visible and every claim traceable to its evidence.
 
 **Why this priority**: This is the actual decision-support the whole pipeline exists to produce.
 Everything upstream (collect, pre-triage, normalize) only prepares the input for this step; without
@@ -75,21 +94,23 @@ the hard-constraint failure surfaced separately from the qualification table.
 **Acceptance Scenarios**:
 
 1. **Given** a verified Job Record whose required items are all supported by the evidence base,
-   **When** scoring runs, **Then** each required item's row shows a "met" verdict with the specific
-   evidence file and section it cites, and the overall verdict reflects a strong match.
+   **When** scoring runs, **Then** each required item's row shows a `Strong` verdict with the
+   specific evidence file and section it cites, and the overall verdict is `APPLY`.
 2. **Given** a verified Job Record with one required item the evidence base does not support,
-   **When** scoring runs, **Then** that item's row shows "not met" or "unknown" (never invented),
-   and the overall verdict reflects the gap.
+   **When** scoring runs, **Then** that item's row shows `Fails`, `Absent`, or `Unknown` (never
+   invented), and the overall verdict is `SKIP` (or `APPLY-AND-SEE` only if the narrow-adjacent-
+   subskill exception applies).
 3. **Given** a verified Job Record that fails a hard constraint (e.g. a disallowed location, or a
    compensation range below the configured floor), **When** scoring runs, **Then** the hard
    constraint failure is reported in its own section, separate from the requirement table, and the
-   overall verdict cannot be a positive match regardless of qualification fit.
+   overall verdict is `SKIP` regardless of qualification fit.
 4. **Given** a verified Job Record whose posting title implies materially more seniority or scope
    than its stated requirements support, **When** scoring runs, **Then** the title-vs-requirements
    mismatch is flagged and does not by itself raise the verdict.
 5. **Given** a verified Job Record whose only supporting evidence for a leadership or mentoring
    requirement is old enough to fall outside the configured recency window, **When** scoring runs,
-   **Then** that item's row is discounted rather than counted as a plain "met".
+   **Then** that item's row is downgraded one level (e.g. `Strong` → `Partial`) rather than left at
+   its undiscounted verdict.
 6. **Given** a Job Record already scored in a previous run with no material change to the record or
    the evidence base, **When** scoring runs again, **Then** the existing evaluation is left in place
    rather than duplicated.
@@ -129,9 +150,12 @@ unresolvable, is scored, and carries a visible flag on its evaluation.
 3. **Given** a Job Record with no ATS posting-API signal available (a non-ATS source, or an
    unreachable API), **When** verification runs, **Then** the record is marked unresolvable, is
    still scored, and its evaluation output carries a visible "open status unverified" flag.
-4. **Given** a Job Record already marked confirmed-open or confirmed-closed in a previous run with
-   no re-check requested, **When** verification runs again, **Then** the existing mark is left in
-   place rather than recomputed.
+4. **Given** a Job Record already marked `confirmed-closed` in a previous run, **When** verification
+   runs again, **Then** it is not re-checked and the mark is left in place.
+5. **Given** a Job Record already marked `confirmed-open` in a previous run whose posting has since
+   closed, **When** verification runs again, **Then** the ATS posting API is re-checked, the mark is
+   updated to `confirmed-closed`, and the change is recorded — without deleting or re-scoring any
+   evaluation already produced while it was open.
 
 ---
 
@@ -219,8 +243,9 @@ the corresponding named outcome from the fixed vocabulary in every case, never f
   missing evidence base — an empty evidence base cannot support a cited verdict.
 - A Job Record's hard-constraint-relevant fields (location, salary) are "unknown" from feature 001's
   normalization: the hard-constraint check cannot rule the record in or out on that axis, so it is
-  recorded as "unknown" for that constraint (never assumed to pass) and scoring proceeds on the
-  qualification table with that caveat visible.
+  recorded as `unresolved` for that constraint (never assumed to pass), and the overall verdict is
+  `APPLY-AND-SEE` with the blocker surfaced (or `SKIP` if more likely than not to fail), per the
+  rubric's unresolved-hard-constraint rule.
 - Two runs happen close together with no new Job Records and no evidence-base change: the second run
   produces zero new evaluations, zero changed application-state values, and zero changed still-open
   marks (idempotent re-run, mirroring feature 001's SC-006).
@@ -266,29 +291,41 @@ the corresponding named outcome from the fixed vocabulary in every case, never f
   and reason MUST be recorded.
 - **FR-002b**: A Job Record classified unresolvable MUST still be scored, and its evaluation output
   MUST carry a visible "open status unverified" flag.
-- **FR-002c**: An open-status mark already set on a Job Record with no re-check requested MUST be
-  left in place on a later run rather than recomputed.
+- **FR-002c**: On every run, the system MUST re-check the open status of every Job Record currently
+  marked `confirmed-open` or `unresolvable` (§ FR-002). A Job Record marked `confirmed-closed` MUST
+  NOT be re-checked — that mark is terminal. A re-check that reproduces the existing mark MUST NOT
+  write a duplicate mark or provenance entry (§ FR-009); a re-check that changes the mark MUST update
+  it and record why.
+- **FR-002d**: The system MUST pace and cap the FR-002c re-check calls using feature 001's existing
+  per-source pacing mechanism (a configurable minimum delay between fetches and a configurable
+  per-run fetch cap, `FR-006a`) rather than a second, feature-004-owned pacing config. Defaults MUST
+  be conservative enough to avoid triggering source-side rate limiting.
 - **FR-003**: For each confirmed-open or unresolvable, kept Job Record, the system MUST extract its
   required and preferred qualifications as discrete items (reusing feature 001's requirements list
   where already discrete) and score each required item against the configured evidence base with an
-  explicit verdict (met / partially met / not met / unknown) and a citation to the specific
-  evidence-file section it rests on.
+  explicit verdict — `Strong` / `Partial` / `Fails` / `Absent` / `Unknown` — and a citation to the
+  specific evidence-file section it rests on.
 - **FR-004**: The system MUST evaluate hard constraints (minimum compensation, disallowed
   locations, required clearance or work authorization the user lacks, excluded role natures) for
-  each scored Job Record in a section separate from the qualification table, and a hard-constraint
-  failure MUST prevent a positive overall verdict regardless of qualification fit.
+  each scored Job Record in a section separate from the qualification table, with each constraint
+  recorded as pass, fail, or `unresolved`. Any hard-constraint fail MUST force an overall verdict of
+  `SKIP` regardless of qualification fit.
 - **FR-004a**: When a Job Record's field relevant to a hard constraint is "unknown," the system MUST
-  record that constraint as "unknown" rather than assuming pass or fail, and MUST surface this
-  caveat on the evaluation.
+  record that constraint as `unresolved` rather than assuming pass or fail; an `unresolved` hard
+  constraint MUST cap the overall verdict at `APPLY-AND-SEE` (blocker surfaced prominently), or force
+  `SKIP` when the constraint is more likely than not to fail.
 - **FR-005**: The system MUST check each scored Job Record for: domain-crossover overclaim (crediting
   qualification for adjacent-but-different domain experience), title-versus-requirements mismatch
   (a title implying more seniority/scope than the stated requirements support), and a recency
   discount on leadership/mentoring evidence older than the configured recency window. Each check's
   result MUST be visible in the evaluation output and MUST NOT be silently folded into the
   requirement table's raw verdicts.
-- **FR-006**: The system MUST produce one overall fit verdict per scored Job Record on a fixed
-  scale, reconciled with (not contradicting) the requirement-by-requirement table and the
-  hard-constraint section.
+- **FR-006**: The system MUST produce one overall fit verdict per scored Job Record — `SKIP` /
+  `APPLY-AND-SEE` / `APPLY` — reconciled with (not contradicting) the requirement-by-requirement
+  table and the hard-constraint section: any required item `Fails` or `Absent` forces `SKIP` (unless
+  the narrow-adjacent-subskill exception applies, which caps it at `APPLY-AND-SEE`); two or more
+  required items `Partial` forces at least `APPLY-AND-SEE`; otherwise, with hard constraints clear,
+  the verdict is `APPLY`.
 - **FR-007**: Before an evaluation is finalized, the system MUST reconcile application state against
   the applications tracker, using exactly the value set: `unknown`, `not_applied`,
   `application_prepared`, `submitted`, `existing_application`, `withdrawn`, `rejected`,
@@ -300,10 +337,11 @@ the corresponding named outcome from the fixed vocabulary in every case, never f
 - **FR-008**: Every condition that prevents a clean result MUST be recorded using this feature's
   fixed named-outcome vocabulary (§ Key Entities — Named Outcome), never free-text failure
   descriptions.
-- **FR-009**: Verification, scoring, and application-state reconciliation runs MUST be idempotent:
-  re-running with no new Job Records, no evidence-base change, and no applications-tracker change
-  MUST NOT create duplicate evaluations, change existing open-status marks, or change existing
-  application-state values.
+- **FR-009**: Scoring and application-state reconciliation MUST be idempotent: re-running with no
+  new Job Records, no evidence-base change, and no applications-tracker change MUST NOT create
+  duplicate evaluations or change existing application-state values. Open-status re-checks (FR-002c)
+  are the one exception by design — they run every time for non-terminal records — but a re-check
+  that reproduces the same mark MUST NOT write a duplicate mark or provenance entry.
 - **FR-010**: The system MUST allow a bounded delegated sub-task (extraction, normalization,
   evidence matching, citation audit, evaluation critique, still-open classification) to run on a
   fast-tier model call, but MUST treat its output as advisory: the orchestrating step MUST verify
@@ -341,6 +379,9 @@ the corresponding named outcome from the fixed vocabulary in every case, never f
   section, anti-pattern check results (overclaim, title check, recency discount), overall verdict,
   open-status mark, reconciled application-state value, and a link back to the scored Job Record.
   One file per Job Record.
+- **Verdict Scale**: Fixed, per the ported reference rubric — per required-item row: `Strong` /
+  `Partial` / `Fails` / `Absent` / `Unknown`; overall: `SKIP` / `APPLY-AND-SEE` / `APPLY`; each hard
+  constraint independently: pass / fail / `unresolved`. Three distinct scales, never conflated.
 - **Open-Status Mark**: `confirmed-open` · `confirmed-closed` · `unresolvable`, set on a Job Record
   before scoring, re-settable only on an explicit re-check.
 - **Application-State Value**: One of `unknown`, `not_applied`, `application_prepared`,
@@ -374,7 +415,7 @@ the corresponding named outcome from the fixed vocabulary in every case, never f
   judged by a human to accurately reflect the requirement table and the underlying evidence, with no
   invented qualifications.
 - **SC-004**: For a labelled test set containing known hard-constraint failures, 100% are reported
-  in the hard-constraint section and none produce a positive overall verdict.
+  in the hard-constraint section and 100% produce an overall verdict of `SKIP`.
 - **SC-005**: For a labelled test set seeded with title-inflation, domain-crossover, and stale-
   leadership-evidence cases, at least 85% are correctly flagged by the corresponding anti-pattern
   check.
@@ -402,7 +443,9 @@ the corresponding named outcome from the fixed vocabulary in every case, never f
 ## Dependencies
 
 - **Feature 001 (intake & normalize pipeline)** — this feature's sole source of Job Records; read-
-  only for this feature. No dependency on feature 001's collection or pre-triage running again.
+  only for this feature. No dependency on feature 001's collection or pre-triage running again,
+  except that this feature's open-status re-checks (FR-002c/FR-002d) reuse feature 001's per-source
+  pacing mechanism (FR-006a) rather than defining a second one.
 - **`inputs/settings.json`** — extended, not replaced, by this feature's additions (`evidenceBase`,
   `hardConstraints.compFloor`, `targetRoles.streams`). Feature 002 (onboarding & settings), which
   would otherwise own authoring this file, is deferred; the file may be hand-authored until 002 is

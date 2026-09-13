@@ -31,6 +31,13 @@
 
 ## Notes
 
+- `/speckit-clarify` session 2026-09-12 (continued): resolved the verdict scale (adopted the
+  reference rubric's `Strong`/`Partial`/`Fails`/`Absent`/`Unknown` per-row and `SKIP`/
+  `APPLY-AND-SEE`/`APPLY` overall scales verbatim), the open-status re-check cadence (re-check
+  `confirmed-open`/`unresolvable` every run, `confirmed-closed` is terminal — fixed a real
+  contradiction between the old FR-002c and the Edge Cases section), and pacing for those re-checks
+  (reuse feature 001's FR-006a mechanism rather than a second config). No checklist item changed
+  state — the spec was already well-formed; these were ambiguity fixes, not completeness failures.
 - Added 2026-09-12: FR-000a (committed fabricated-persona settings template) and the Golden
   Calibration Set assumption/dependency, addressing the tension between needing real config/
   calibration data to work and keeping personal data out of the public repo — resolved by the same
