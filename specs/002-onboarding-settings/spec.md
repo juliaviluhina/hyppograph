@@ -4,7 +4,10 @@
 
 **Created**: 2026-08-31
 
-**Status**: Draft
+**Status**: Deferred — reconsider after feature 004 (retrieval/fit-screen rework) lands. That
+feature ports a config-driven schema (`job-search.config.yaml` shape) from the already-anonymized
+`hyppoplugins/plugins/job-search` reference; this settings-store design should be reconciled with
+whatever schema 004 actually needs before onboarding is built.
 
 **Input**: User description: "onboarding and settings stage"
 
