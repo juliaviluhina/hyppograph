@@ -31,6 +31,10 @@
 
 ## Notes
 
+- Added 2026-09-12: FR-000a (committed fabricated-persona settings template) and the Golden
+  Calibration Set assumption/dependency, addressing the tension between needing real config/
+  calibration data to work and keeping personal data out of the public repo — resolved by the same
+  external-storage principle already used for `settings.json` and `HYPPO_DATA_DIR`.
 - Three open design questions (settings ownership, retrieval-vs-re-verification scope, interactive
   session scope) were resolved during specification via the Clarifications section rather than left
   as `[NEEDS CLARIFICATION]` markers, since each had a reasonable default consistent with feature

@@ -249,6 +249,12 @@ the corresponding named outcome from the fixed vocabulary in every case, never f
   `inputs/settings.json`) all resolve and are internally consistent. If any is missing, unreadable,
   empty, or inconsistent, the system MUST report the specific unresolved item and exit without
   verifying or scoring any Job Record.
+- **FR-000a**: This repo MUST carry a committed, fabricated-persona settings template covering this
+  feature's `inputs/settings.json` additions (`evidenceBase`, `hardConstraints.compFloor`,
+  `targetRoles.streams`) alongside feature 001's existing sections, so a new data directory can be
+  bootstrapped by copying and editing one file rather than reverse-engineering the test fixtures.
+  The template MUST contain no real personal data — every value is invented, consistent with the
+  existing `tests/fixtures/data-dir` convention.
 - **FR-001**: The system MUST operate only on Job Records already produced by feature 001 (kept by
   pre-triage, normalized). It MUST NOT open a new page-read/navigation session and MUST NOT
   re-run collection.
@@ -347,6 +353,13 @@ the corresponding named outcome from the fixed vocabulary in every case, never f
   step — task type, input scope, model tier, timestamp, review status
   (`pending`/`accepted`/`corrected`/`rejected`), citations and uncertainty notes when relevant.
   Advisory audit trail, not canonical evaluation content.
+- **Settings Template**: A committed, fabricated-persona example of `inputs/settings.json` covering
+  every section feature 001 and this feature read (FR-000a). Copyable to bootstrap a new data
+  directory; never contains real personal data.
+- **Golden Calibration Set**: A set of real, previously-produced posting-and-evaluation pairs used
+  to hand-tune and sanity-check the rubric's anti-pattern checks against genuine edge cases (as
+  distinct from this repo's own synthetic `tests/`-tree fixtures, which stay fabricated). Lives
+  outside this repo entirely; see Assumptions.
 
 ## Success Criteria *(mandatory)*
 
@@ -382,6 +395,9 @@ the corresponding named outcome from the fixed vocabulary in every case, never f
 - **SC-012**: When the evidence base, hard-constraint set, or seniority-stream configuration is
   missing or inconsistent at the start of a run, the run makes zero writes and its output names the
   specific unresolved item.
+- **SC-013**: A person unfamiliar with this feature can bootstrap a working data directory by
+  copying the committed settings template and editing it, without reading the schemas or fixtures
+  first.
 
 ## Dependencies
 
@@ -402,6 +418,10 @@ the corresponding named outcome from the fixed vocabulary in every case, never f
   *what* the rubric, outcome vocabulary, and delegation boundary must cover — not a dependency this
   feature calls into at runtime; HyppoGraph re-implements the equivalent logic as a Workflow-tool
   step with its own tiered subagents, per Constitution Principle I.
+- **The Golden Calibration Set** (real posting/evaluation pairs used to hand-tune the rubric —
+  currently the vault's `specs/010-job-fit-screen-decision-tree-rework/golden-examples`) is consulted
+  only during manual development/calibration of this feature's scoring logic. It is never copied into
+  this repo and is not part of any automated test this repo runs; see Assumptions.
 
 ## Assumptions
 
@@ -427,6 +447,16 @@ the corresponding named outcome from the fixed vocabulary in every case, never f
   verdict; fast-tier (Haiku-class) calls are used only for the bounded, advisory sub-tasks in
   FR-010, reviewed by the orchestrating step before use. This is an implementation constraint, not
   a user-facing requirement.
+- **Real calibration data stays external, same principle as settings**: the rubric's anti-pattern
+  checks (FR-005) are validated during development against a real, personal Golden Calibration Set
+  (currently the vault's `specs/010-job-fit-screen-decision-tree-rework/golden-examples` — real
+  postings scored against real evidence). That set is treated exactly like `settings.json`'s real
+  values: read from an external, gitignored location, never committed to this repo. This repo's own
+  automated tests use only fabricated data, following feature 001/003's existing `tests/fixtures/`
+  and `tests/golden/` convention (synthetic postings, invented personas) — the two golden concepts
+  are deliberately separate: this repo's `tests/golden/` proves the *pipeline* is correct on made-up
+  data; the external Golden Calibration Set is how the *rubric's judgment* gets tuned against real
+  cases, by a human, outside any CI or committed test run.
 - **Delegation boundary carries forward feature 001's subagent pattern**: the fast-tier delegated
   sub-tasks in FR-010/FR-011 are expected to run as `agent()` calls to `hyppo-*`-style subagents
   inside this feature's Workflow script, extending rather than replacing feature 001's
