@@ -11,6 +11,8 @@ import {
   mapSignalToMark,
   isInsufficientInput,
   computeOverallVerdict,
+  fnv1aHex,
+  computeInputFingerprint,
 } from "./support/pure.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -35,7 +37,15 @@ function extractFunction(source, name) {
 test("sync-check: pure.mjs mirrors fit-screen.js verbatim", () => {
   const workflow = fs.readFileSync(WORKFLOW, "utf8");
   const pure = fs.readFileSync(PURE, "utf8");
-  for (const name of ["applyAtsBaseOverride", "buildAtsApiUrl", "mapSignalToMark", "isInsufficientInput", "computeOverallVerdict"]) {
+  for (const name of [
+    "applyAtsBaseOverride",
+    "buildAtsApiUrl",
+    "mapSignalToMark",
+    "isInsufficientInput",
+    "computeOverallVerdict",
+    "fnv1aHex",
+    "computeInputFingerprint",
+  ]) {
     assert.equal(extractFunction(pure, name), extractFunction(workflow, name), `${name} diverged — fix fit-screen.js, then re-copy`);
   }
 });
@@ -91,4 +101,44 @@ test("computeOverallVerdict follows FR-006/FR-004a (T021)", () => {
   assert.equal(computeOverallVerdict(strong2, [hc("unresolved", "likely-fail")]), "SKIP");
   assert.equal(computeOverallVerdict(strong2, [hc("unresolved", "even")]), "APPLY-AND-SEE");
   assert.equal(computeOverallVerdict(strong2, [hc("unresolved", "likely-pass")]), "APPLY-AND-SEE");
+});
+
+test("fnv1aHex is deterministic and 8 hex chars", () => {
+  assert.equal(fnv1aHex("hello"), fnv1aHex("hello"));
+  assert.match(fnv1aHex("hello"), /^[0-9a-f]{8}$/);
+  assert.notEqual(fnv1aHex("hello"), fnv1aHex("hellp"));
+});
+
+test("computeInputFingerprint (006 T007/contracts/eval-fingerprint.md): equal inputs -> equal hash, any change -> different hash, clock-immune", () => {
+  const base = {
+    rec: {
+      roleTitle: "Backend Engineer",
+      canonicalCompany: "Acme",
+      locations: ["remote-eu"],
+      salaryAmountOrRange: "120k",
+      salaryCurrency: "USD",
+      responsibilitiesSummary: "Build things.",
+      requirements: ["Node.js", "Postgres"],
+      openStatus: "confirmed-open",
+    },
+    evidenceFiles: [{ path: "cv.md", content: "CV text" }],
+    applications: { exists: true, content: "tracker row" },
+    hardConstraints: { compFloor: null, excludedRoleNatures: [] },
+    hardStops: { excludedLocations: [], lackedClearances: [], lackedWorkAuth: [], visaSponsorshipRequired: false },
+    targetRoles: { streams: [], recencyWindowYears: 5 },
+  };
+  const clone = JSON.parse(JSON.stringify(base));
+  assert.equal(computeInputFingerprint(base), computeInputFingerprint(clone), "identical inputs must hash identically");
+
+  const changedRec = { ...base, rec: { ...base.rec, roleTitle: "Staff Engineer" } };
+  assert.notEqual(computeInputFingerprint(base), computeInputFingerprint(changedRec), "changed Job Record field must change the hash");
+
+  const changedEvidence = { ...base, evidenceFiles: [{ path: "cv.md", content: "different CV text" }] };
+  assert.notEqual(computeInputFingerprint(base), computeInputFingerprint(changedEvidence), "changed evidence must change the hash");
+
+  const noTracker = { ...base, applications: { exists: false, content: "" } };
+  assert.notEqual(computeInputFingerprint(base), computeInputFingerprint(noTracker), "tracker absence (NO_TRACKER sentinel) must differ from an empty-but-present tracker");
+
+  const emptyTracker = { ...base, applications: { exists: true, content: "" } };
+  assert.notEqual(computeInputFingerprint(noTracker), computeInputFingerprint(emptyTracker), "absent tracker and empty-but-present tracker must hash differently (data-model.md determinism note)");
 });

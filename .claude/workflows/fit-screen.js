@@ -563,6 +563,34 @@ const scorable = records.filter((r) => r.openStatus === "confirmed-open" || r.op
 let batchCitationAuditsUsed = 0; // T022 — citation_audit fires once a batch persists 2+ evaluations
 
 await pipeline(scorable, async (rec) => {
+  // 006 T004/FR-001 — idempotency guard: compute this record's input fingerprint and compare
+  // against the existing evaluation's stored one BEFORE any model call. Equal ⇒ skip scoring,
+  // skip writes, skip provenance (contracts/eval-fingerprint.md). Read-before-write is the pin
+  // tests/harness/support/structure.mjs:hasIdempotencyGuard() asserts.
+  const fingerprint = computeInputFingerprint({
+    rec,
+    evidenceFiles: settings.evidenceBase.files,
+    applications,
+    hardConstraints: settings.hardConstraints,
+    hardStops: settings.hardStops,
+    targetRoles: settings.targetRoles,
+  });
+  const existingEval = await agent(
+    [
+      `Read this file's exact text if it exists (found=true, full content); if it does not exist,`,
+      `report found=false with empty content:`,
+      `  ${DATA}/outputs/evaluations/${rec.key}.md`,
+    ].join("\n"),
+    { schema: rawFileReadSchema, label: `read-evaluation:${rec.key}`, model: FAST, phase: "score", agentType: "hyppo-read" }
+  );
+  if (existingEval.found) {
+    const m = /^inputFingerprint:\s*"?([0-9a-f]{8})"?\s*$/m.exec(existingEval.content);
+    if (m && m[1] === fingerprint) {
+      summary.skippedIdempotent++;
+      return; // untouched — no score call, no writes, no provenance (FR-001)
+    }
+  }
+
   const insufficientInput = isInsufficientInput(rec); // T041 — deterministic, code-owned check
 
   let evalResult;
@@ -673,18 +701,55 @@ await pipeline(scorable, async (rec) => {
     }
   }
 
-  await agent(
-    buildEvaluationWritePrompt({
-      dataDir: DATA,
-      rec,
-      run: RUN,
-      overallVerdict,
-      namedOutcome,
-      evalResult,
-      delegations,
-    }),
-    { schema: writtenAckSchema, label: `write-evaluation:${rec.key}`, model: FAST, phase: "score", agentType: "hyppo-readwrite" }
-  );
+  const evalPromptText = buildEvaluationWritePrompt({
+    dataDir: DATA,
+    rec,
+    run: RUN,
+    overallVerdict,
+    namedOutcome,
+    evalResult,
+    delegations,
+    inputFingerprint: fingerprint,
+  });
+  const evalFilePath = `${DATA}/outputs/evaluations/${rec.key}.md`;
+  await agent(evalPromptText, {
+    schema: writtenAckSchema,
+    label: `write-evaluation:${rec.key}`,
+    model: FAST,
+    phase: "score",
+    agentType: "hyppo-readwrite",
+  });
+
+  // 006 T017 — verify the write landed with its opening "---" delimiter intact. Found live in the
+  // 2026-09-14 session run: a fast-tier write occasionally drops just the leading front-matter
+  // delimiter line while faithfully writing everything else (2 of 9 records). One read-back + one
+  // retry, same bounded ack/retry/loud-log pattern as the F2 summary-write fix — never silently
+  // persist a malformed evaluation file.
+  const readBack = () =>
+    agent(`Read this file's exact text (found=false with empty content if it does not exist):\n  ${evalFilePath}`, {
+      schema: rawFileReadSchema,
+      label: `verify-evaluation-shape:${rec.key}`,
+      model: FAST,
+      phase: "score",
+      agentType: "hyppo-read",
+    });
+  // A failed agent() call (e.g. a mid-run quota interruption) resolves null here rather than
+  // throwing — guard every read before touching its fields, never assume a call succeeded.
+  const shapeOk = (r) => !!r && r.found && r.content.startsWith("---\n");
+  let shapeCheck = await readBack();
+  if (!shapeOk(shapeCheck)) {
+    await agent(evalPromptText, {
+      schema: writtenAckSchema,
+      label: `write-evaluation:${rec.key}`,
+      model: FAST,
+      phase: "score",
+      agentType: "hyppo-readwrite",
+    });
+    shapeCheck = await readBack();
+    if (!shapeOk(shapeCheck)) {
+      log("write-evaluation FAILED shape check twice — file may be missing its front-matter delimiter", { key: rec.key });
+    }
+  }
 
   // T036 — migrate alreadyApplied -> applicationState on this same write, clean replacement.
   await agent(
@@ -729,6 +794,39 @@ return { ok: true, summary };
 /* ------------------------------------------------------------------ *
  * Inline helpers (T009) — hoisted function declarations; the sandbox forbids `import`.
  * ------------------------------------------------------------------ */
+
+// 006 T003 — FNV-1a 32-bit over UTF-16 code units, hex, zero-padded to 8 chars.
+// contracts/eval-fingerprint.md — mirrored verbatim in tests/harness/support/pure.mjs (T007).
+function fnv1aHex(str) {
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < str.length; i++) {
+    hash ^= str.charCodeAt(i);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return (hash >>> 0).toString(16).padStart(8, "0");
+}
+
+// 006 T003 — contracts/eval-fingerprint.md. parts[0] is the parsed-record proxy (T002 decision),
+// not raw file text: identical shape to buildScorePrompt's JOB RECORD JSON, so anything that could
+// change hyppo-score's answer is already covered.
+function computeInputFingerprint({ rec, evidenceFiles, applications, hardConstraints, hardStops, targetRoles }) {
+  const parts = [
+    JSON.stringify({
+      roleTitle: rec.roleTitle,
+      canonicalCompany: rec.canonicalCompany,
+      locations: rec.locations,
+      salaryAmountOrRange: rec.salaryAmountOrRange,
+      salaryCurrency: rec.salaryCurrency,
+      responsibilitiesSummary: rec.responsibilitiesSummary,
+      requirements: rec.requirements,
+      openStatus: rec.openStatus,
+    }),
+    ...evidenceFiles.map((f) => f.content),
+    applications.exists ? applications.content : "NO_TRACKER",
+    JSON.stringify({ hardConstraints, hardStops, targetRoles }),
+  ];
+  return fnv1aHex(parts.join("\n---\n"));
+}
 
 function slug(s) {
   return String(s)
@@ -875,6 +973,7 @@ function newRunSummary(run) {
     verifiedConfirmedClosed: 0,
     verifiedUnresolvable: 0,
     scored: 0,
+    skippedIdempotent: 0, // 006 T006/data-model.md RunSummary amendment
     verdictCounts: { SKIP: 0, "APPLY-AND-SEE": 0, APPLY: 0 },
     hardConstraintFailures: 0,
     applicationStateCounts: {
@@ -900,6 +999,7 @@ function renderSummary(s) {
     `Run ${s.run}`,
     `  verified confirmed-open / confirmed-closed / unresolvable : ${s.verifiedConfirmedOpen} / ${s.verifiedConfirmedClosed} / ${s.verifiedUnresolvable}`,
     `  scored                  : ${s.scored}`,
+    `  skipped (unchanged)     : ${s.skippedIdempotent}`,
     `  verdicts (SKIP / APPLY-AND-SEE / APPLY) : ${s.verdictCounts.SKIP} / ${s.verdictCounts["APPLY-AND-SEE"]} / ${s.verdictCounts.APPLY}`,
     `  hard-constraint failures: ${s.hardConstraintFailures}`,
   ];
@@ -916,12 +1016,24 @@ function renderSummary(s) {
   return lines.join("\n");
 }
 
+// 006 T011/F2/contracts/summary-write.md — single writer (hyppo-readwrite), checked ack, one
+// retry, loud log on persistent failure. Never a silent `false` (the F2 lesson).
 async function writeSummary(dataDir, summary) {
   const rendered = renderSummary(summary);
-  await agent(
-    [`Write this exact text to ${dataDir}/outputs/last-run-summary-fit-screen.md (overwrite):`, "", rendered].join("\n"),
-    { schema: writtenAckSchema, label: "write-run-summary", model: FAST, agentType: "hyppo-write" }
-  );
+  const prompt = [`Write this exact text to ${dataDir}/outputs/last-run-summary-fit-screen.md (overwrite):`, "", rendered].join("\n");
+  const attempt = () =>
+    agent(prompt, { schema: writtenAckSchema, label: "write-run-summary", model: FAST, agentType: "hyppo-readwrite" });
+
+  // A failed agent() call (e.g. a mid-run quota interruption) resolves null here rather than
+  // throwing — guard before touching `.written`, never assume the call succeeded.
+  let ack = await attempt();
+  if (!ack?.written) {
+    ack = await attempt(); // single retry, identical prompt
+  }
+  if (!ack?.written) {
+    log("write-run-summary FAILED twice\nsummary.write-failed", { rendered });
+    return;
+  }
   log("run summary\n" + rendered, { summary });
 }
 
@@ -1000,7 +1112,7 @@ function buildScorePrompt({ rec, evidenceText, evidenceFiles, hardConstraints, h
 }
 
 // The Fit Evaluation write prompt (T023/contracts/evaluation-format.md).
-function buildEvaluationWritePrompt({ dataDir, rec, run, overallVerdict, namedOutcome, evalResult, delegations }) {
+function buildEvaluationWritePrompt({ dataDir, rec, run, overallVerdict, namedOutcome, evalResult, delegations, inputFingerprint }) {
   const reqRows = evalResult.requirementTable
     .map((r) => `| ${r.requirement} | ${r.verdict} | ${r.evidenceFile ? `${r.evidenceFile} § ${r.evidenceSection}` : "—"} |`)
     .join("\n");
@@ -1054,6 +1166,7 @@ function buildEvaluationWritePrompt({ dataDir, rec, run, overallVerdict, namedOu
     ),
     `scoredAt: ${JSON.stringify(run)}`,
     `evidenceFilesUsed: ${JSON.stringify([...new Set(evalResult.requirementTable.map((r) => r.evidenceFile).filter(Boolean))])}`,
+    `inputFingerprint: ${JSON.stringify(inputFingerprint)}`,
     "---",
   ].join("\n");
 
@@ -1083,11 +1196,20 @@ function buildEvaluationWritePrompt({ dataDir, rec, run, overallVerdict, namedOu
     "",
   ].join("\n");
 
+  // 006 T017 — found live in the 2026-09-14 session run: a blank line immediately followed by the
+  // YAML front-matter's opening "---" was consistently (not flaky — reproduced identically on a
+  // same-prompt retry) misread as this INSTRUCTION's own markdown rule rather than file data, so the
+  // leading delimiter got silently dropped from the written file. Explicit BEGIN/END markers around
+  // the literal content remove the ambiguity — the model no longer has to guess where instruction
+  // formatting ends and file bytes begin.
   return [
-    `Write this EXACT content to (overwrite if it already exists — a later score pass replaces, never`,
-    `appends): ${dataDir}/outputs/evaluations/${rec.key}.md`,
+    `Write the EXACT content between the BEGIN-CONTENT and END-CONTENT markers below (excluding the`,
+    `marker lines themselves — they are not part of the file) to (overwrite if it already exists — a`,
+    `later score pass replaces, never appends): ${dataDir}/outputs/evaluations/${rec.key}.md`,
     "",
+    "BEGIN-CONTENT",
     frontMatter + body,
+    "END-CONTENT",
   ].join("\n");
 }
 

@@ -41,8 +41,9 @@ export function hasNonBlockingAudit(src = workflowSource()) {
   return !/\b(return|continue|throw)\b/.test(src.slice(mi, wi));
 }
 
-// T024 pin (red until 006): the score phase reads the existing evaluation file
-// before writing — the prerequisite for skip-when-unchanged.
+// T024 pin (implemented 006 T004): the score phase reads the existing evaluation file
+// before writing — the prerequisite for skip-when-unchanged. If 006 legitimately
+// restructures this, update the regex to match — never delete the pin silently.
 export function hasIdempotencyGuard(src = workflowSource()) {
   return /read-evaluation|existingEval|existing-evaluation|skip.*unchanged|unchanged.*skip/i.test(src);
 }

@@ -3,6 +3,10 @@
 // shaped like a session run produced it, assertScratch must pass the good shape
 // and fail each broken shape with the right note. Covers matrix (T010), summary
 // consistency (T011), and service-log isolation (T012).
+// 006 R3 — these scratch dirs fabricate on-disk state directly (no real wire call),
+// so every assertScratch call here passes wire="live" to exercise the real matrix
+// logic on the ATS-backed keys instead of the isolated-run `blocked` short-circuit;
+// see blocked-mode.test.mjs for that behavior.
 import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
@@ -81,7 +85,7 @@ function verdictOf(cases, name) {
 test("full-flow: good session-shaped scratch passes everything", async () => {
   const s = goodScratch();
   try {
-    const { cases, isolationProof } = await assertScratch(s.dir, s.alog);
+    const { cases, isolationProof } = await assertScratch(s.dir, s.alog, undefined, null, "live");
     assert.ok(cases.length > 0);
     assert.deepEqual(cases.filter((c) => c.verdict !== "pass"), [], JSON.stringify(cases, null, 2));
     assert.ok(isolationProof.atsCallsInServiceLog >= ATS_PATHS.length);
@@ -94,7 +98,7 @@ test("full-flow: wrong verdict fails its matrix case", async () => {
   const s = goodScratch();
   try {
     writeEval(s.dir, "acme--backend-engineer--remote-eu", "SKIP");
-    const { cases } = await assertScratch(s.dir, s.alog);
+    const { cases } = await assertScratch(s.dir, s.alog, undefined, null, "live");
     assert.equal(verdictOf(cases, "matrix:acme--backend-engineer--remote-eu"), "unexpected-red");
   } finally {
     s.cleanup();
@@ -105,7 +109,7 @@ test("full-flow: missing evaluation fails; evaluation on closed fails twice", as
   let s = goodScratch();
   try {
     fs.rmSync(path.join(s.dir, "outputs", "evaluations", "acme--backend-engineer--remote-eu.md"));
-    const { cases } = await assertScratch(s.dir, s.alog);
+    const { cases } = await assertScratch(s.dir, s.alog, undefined, null, "live");
     assert.equal(verdictOf(cases, "matrix:acme--backend-engineer--remote-eu"), "unexpected-red");
   } finally {
     s.cleanup();
@@ -113,7 +117,7 @@ test("full-flow: missing evaluation fails; evaluation on closed fails twice", as
   s = goodScratch();
   try {
     writeEval(s.dir, "initech--backend-engineer--remote-eu", "SKIP");
-    const { cases } = await assertScratch(s.dir, s.alog);
+    const { cases } = await assertScratch(s.dir, s.alog, undefined, null, "live");
     assert.equal(verdictOf(cases, "matrix:initech--backend-engineer--remote-eu"), "unexpected-red");
     assert.equal(verdictOf(cases, "summary:no-eval-on-closed"), "unexpected-red");
   } finally {
@@ -125,7 +129,7 @@ test("full-flow: summary mismatch and missing summary fail", async () => {
   let s = goodScratch();
   try {
     writeSummary(s.dir, { o: 2, c: 2, u: 6, scored: 999, skip: 3, mid: 0, apply: 5 });
-    const { cases } = await assertScratch(s.dir, s.alog);
+    const { cases } = await assertScratch(s.dir, s.alog, undefined, null, "live");
     assert.equal(verdictOf(cases, "summary:scored-matches-files"), "unexpected-red");
   } finally {
     s.cleanup();
@@ -133,7 +137,7 @@ test("full-flow: summary mismatch and missing summary fail", async () => {
   s = goodScratch();
   try {
     fs.rmSync(path.join(s.dir, "outputs", "last-run-summary-fit-screen.md"));
-    const { cases } = await assertScratch(s.dir, s.alog);
+    const { cases } = await assertScratch(s.dir, s.alog, undefined, null, "live");
     assert.equal(verdictOf(cases, "summary:present"), "unexpected-red");
   } finally {
     s.cleanup();
@@ -144,14 +148,14 @@ test("full-flow: incomplete access log and missing log file fail isolation", asy
   let s = goodScratch();
   try {
     writeAccessLog(s.alog, ATS_PATHS.slice(0, 2));
-    const { cases } = await assertScratch(s.dir, s.alog);
+    const { cases } = await assertScratch(s.dir, s.alog, undefined, null, "live");
     assert.equal(verdictOf(cases, "isolation:service-log-covers"), "unexpected-red");
   } finally {
     s.cleanup();
   }
   s = goodScratch();
   try {
-    const { cases } = await assertScratch(s.dir, path.join(s.dir, "nope.jsonl"));
+    const { cases } = await assertScratch(s.dir, path.join(s.dir, "nope.jsonl"), undefined, null, "live");
     assert.equal(verdictOf(cases, "isolation:access-log"), "unexpected-red");
   } finally {
     s.cleanup();

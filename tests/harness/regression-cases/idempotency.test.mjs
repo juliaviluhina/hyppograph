@@ -1,17 +1,12 @@
-// 005 US4 (T027) — idempotency-unchanged-rerun: RED BY DESIGN until 006.
-// The score phase re-scores unconditionally (004 T024 reopened 2026-09-14): the
-// workflow never reads the existing evaluation before writing, so it cannot skip
-// unchanged records. This case asserts the structural prerequisite (an existing-
-// evaluation read in the score phase) and fails until 006 implements it.
-// The runner maps exactly this case name to `expected-red`; see
-// contracts/harness-report.md. Do NOT rename it without a spec amendment.
+// 005 US4 (T027) — idempotency-unchanged-rerun. Was RED BY DESIGN until 006 (004 T024
+// reopened 2026-09-14: the score phase re-scored unconditionally, never reading the
+// existing evaluation before writing). 006 T004 implemented the read-before-write
+// fingerprint guard; this case is now an ordinary structural pin like the others in
+// structure.mjs — no special-cased verdict in run.mjs (006 T009 retired that passthrough).
 import test from "node:test";
 import assert from "node:assert/strict";
 import { hasIdempotencyGuard } from "../support/structure.mjs";
 
 test("idempotency-unchanged-rerun: score phase reads existing evaluation before write", () => {
-  assert.ok(
-    hasIdempotencyGuard(),
-    "T024 not implemented: no existing-evaluation read in the score phase (fix owns to 006)"
-  );
+  assert.ok(hasIdempotencyGuard(), "no existing-evaluation read found in the score phase");
 });

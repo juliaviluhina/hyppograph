@@ -10,7 +10,7 @@ changes shape.
 | Field | Type | Notes |
 |---|---|---|
 | `algorithm` | literal `"fnv1a-hex"` | FNV-1a over UTF-16 code units, hex-encoded; implementable in the workflow sandbox (no imports) and mirrored in `tests/harness/support/pure.mjs` |
-| `inputs` | ordered concatenation | Job Record file text + `\n---\n` + each evidence file's text in `evidenceBase.files` order joined by `\n---\n` + `\n---\n` + tracker text or `"NO_TRACKER"` + `\n---\n` + canonical `JSON.stringify` of `{hardConstraints, hardStops, targetRoles}` |
+| `inputs` | ordered concatenation | Canonical `JSON.stringify` of the parsed Job Record fields hyppo-score is shown (`roleTitle`, `canonicalCompany`, `locations`, `salaryAmountOrRange`, `salaryCurrency`, `responsibilitiesSummary`, `requirements`, `openStatus` — the same shape `buildScorePrompt` serializes; T002 decision, not raw file text) + `\n---\n` + each evidence file's text in `evidenceBase.files` order joined by `\n---\n` + `\n---\n` + tracker text or `"NO_TRACKER"` + `\n---\n` + canonical `JSON.stringify` of `{hardConstraints, hardStops, targetRoles}` |
 | `value` | hex string | Stored; compared for equality only, never parsed |
 
 Determinism notes: evidence order is the settings list order (not filesystem order);

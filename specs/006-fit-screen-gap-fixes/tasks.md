@@ -30,9 +30,10 @@ layer). Node-layer coverage is added only for the fingerprint helper's mirror (T
 
 ## Phase 1: Setup
 
-- [ ] T001 Run `npm run harness` and record the pre-fix baseline report alongside this file's
+- [X] T001 Run `npm run harness` and record the pre-fix baseline report alongside this file's
       commit (node layer only — no session run needed yet): confirms starting state is exactly
-      `intake.md`'s (1 expected-red, 0 unexpected-red from node).
+      `intake.md`'s (1 expected-red, 0 unexpected-red from node). **Done 2026-09-14**: baseline
+      confirmed — 1 expected-red (`idempotency-unchanged-rerun`), 0 unexpected-red, 54 total.
 
 ---
 
@@ -55,7 +56,10 @@ records (spec Edge Cases: "never rewrite" is as wrong as "always rewrite").
 
 ### Implementation for User Story 1
 
-- [ ] T002 [US1] Resolve the fingerprint input-source gap before writing code: research.md R1 /
+- [X] T002 [US1] **Done 2026-09-14** — decided (b): hash the in-memory parsed record fields
+      (identical shape to `buildScorePrompt`'s JOB RECORD JSON), not raw file text. Amended
+      `contracts/eval-fingerprint.md` and `data-model.md` accordingly.
+      Resolve the fingerprint input-source gap before writing code: research.md R1 /
       `contracts/eval-fingerprint.md` specify hashing the raw **Job Record file text**, but the score
       phase's `records` array (`fit-screen.js:427`, built from the verify-phase index) only holds
       parsed fields — no raw file text is in memory at the score-phase call site
@@ -68,11 +72,11 @@ records (spec Edge Cases: "never rewrite" is as wrong as "always rewrite").
       zero extra calls, same determinism, but diverges from "file text" as literally written.
       Recommended: (b). Update the contract file to match whichever is chosen — spec Edge Cases:
       "fix the spec first, then the code."
-- [ ] T003 [US1] Implement `fnv1aHex(str)` and a `computeInputFingerprint({ rec, evidenceText,
+- [X] T003 [US1] Implement `fnv1aHex(str)` and a `computeInputFingerprint({ rec, evidenceText,
       evidenceFiles, applications, hardConstraints, hardStops, targetRoles })` hoisted helper in
       `.claude/workflows/fit-screen.js` (near the other inline helpers, ~line 733), per
       `contracts/eval-fingerprint.md`'s computation rule as amended by T002.
-- [ ] T004 [US1] In the score phase's `pipeline(scorable, ...)` callback
+- [X] T004 [US1] In the score phase's `pipeline(scorable, ...)` callback
       (`.claude/workflows/fit-screen.js:565`), before the `hyppo-score` agent call (line 579): read
       the existing `outputs/evaluations/<key>.md` front matter via `hyppo-read` (missing file ⇒
       proceed to scoring as today), recompute the fingerprint via T003's helper, compare against the
@@ -80,26 +84,33 @@ records (spec Edge Cases: "never rewrite" is as wrong as "always rewrite").
       evaluation write, the application-state migration write, and the provenance append entirely;
       bump `summary.skippedIdempotent`; move to the next record. Different or missing ⇒ proceed
       exactly as today. Depends on: T003.
-- [ ] T005 [US1] Add `inputFingerprint: ${JSON.stringify(fingerprint)}` to the evaluation front
+- [X] T005 [US1] Add `inputFingerprint: ${JSON.stringify(fingerprint)}` to the evaluation front
       matter in `buildEvaluationWritePrompt` (`.claude/workflows/fit-screen.js:1055`, alongside
       `scoredAt`), persisted on every real (non-skipped) write. Depends on: T003.
-- [ ] T006 [US1] Add a `skippedIdempotent` counter: initialize in `newRunSummary`
+- [X] T006 [US1] Add a `skippedIdempotent` counter: initialize in `newRunSummary`
       (`fit-screen.js:871`), increment in T004, render it beside `scored` in `renderSummary`
       (`fit-screen.js:898`), per data-model.md's RunSummary amendment. Depends on: T004.
-- [ ] T007 [P] [US1] Mirror `fnv1aHex`/`computeInputFingerprint` verbatim into
+- [X] T007 [P] [US1] Mirror `fnv1aHex`/`computeInputFingerprint` verbatim into
       `tests/harness/support/pure.mjs`, per that file's existing convention ("fix the workflow file
       first, then re-copy here, never the reverse"); extend `pure.test.mjs`'s sync-check function
       list to cover the new function(s). Depends on: T003 (copy after the workflow version is final).
-- [ ] T008 [US1] Check `hasIdempotencyGuard()` in `tests/harness/support/structure.mjs:46` against
+- [X] T008 [US1] Check `hasIdempotencyGuard()` in `tests/harness/support/structure.mjs:46` against
       T004's actual implementation — its regex
       (`read-evaluation|existingEval|existing-evaluation|skip.*unchanged|unchanged.*skip`) must match
       real source text; update the pin (never delete it) if naming differs, per the file's own
       header comment. Depends on: T004.
-- [ ] T009 [US1] Retire the hardcoded `expected-red` handling for `idempotency-unchanged-rerun`:
+- [X] T009 [US1] Retire the hardcoded `expected-red` handling for `idempotency-unchanged-rerun`:
       update `EXPECTED_RED_CASE` in `tests/harness/support/expectations.mjs` and its consumption in
       `tests/harness/run.mjs` so the case is asserted as an ordinary `pass`/`unexpected-red` case
       like every other. Depends on: T004, T008.
-- [ ] T010 [US1] Session validation — quickstart.md scenarios 1–2: `--prep` a scratch dir, session-run
+- [ ] T010 [US1] **PARTIALLY DONE 2026-09-14** — 3 live session runs exist (see T016), each a
+      first-time run against a fresh scratch dir (`skippedIdempotent: 0` each time, correctly —
+      no prior evaluations existed to skip). The actual idempotency proof — re-running unchanged
+      against the SAME scratch dir and confirming zero diffs — and the genuine-change counter-case
+      are still **PENDING**, deferred to conserve session quota after today's interruption; not
+      executed without checking in first (Workflow-tool session runs are costly: ~80-90 agents,
+      ~600-800k tokens, 10-13 min each in this environment). Session validation — quickstart.md
+      scenarios 1–2: `--prep` a scratch dir, session-run
       the workflow, `--assert`; re-run the workflow **unchanged** against the same scratch dir,
       `--assert` again (expect byte-identical evaluation files, zero new provenance lines,
       `summary.skippedIdempotent` equal to the scored count, no mid-tier calls on the second run).
@@ -121,7 +132,7 @@ code `0`.
 
 ### Implementation for User Story 2
 
-- [ ] T011 [P] [US2] Fix F2: switch `writeSummary`'s agent call
+- [X] T011 [P] [US2] Fix F2: switch `writeSummary`'s agent call
       (`.claude/workflows/fit-screen.js:919-924`) from `agentType: "hyppo-write"` to
       `"hyppo-readwrite"` (single-writer rule); check the returned `written` ack in code; on `false`,
       retry once via `hyppo-readwrite` with the identical prompt; on a second `false`, `log()` loudly
@@ -129,25 +140,37 @@ code `0`.
       `summary.write-failed` line in the run output — never silently continue. Per
       `contracts/summary-write.md`. No dependency on US1 (different function, same file — do not run
       literally concurrently with T004–T006 edits to avoid merge noise, but no logical dependency).
-- [ ] T012 [P] [US2] Add `requiresWire: true` to the three ATS entries (`acme--backend-engineer...`,
+- [X] T012 [P] [US2] Add `requiresWire: true` to the three ATS entries (`acme--backend-engineer...`,
       `initech--backend-engineer...`, `umbrella--backend-engineer...`) in
       `tests/harness/support/expectations.mjs`, per `contracts/harness-report-amendment.md`.
-- [ ] T013 [US2] Add a `--wire live|isolated` flag (default `isolated`) to `tests/harness/run.mjs`'s
+- [X] T013 [US2] Add a `--wire live|isolated` flag (default `isolated`) to `tests/harness/run.mjs`'s
       `--assert` mode; thread it into `assertScratch()`'s signature in
       `tests/harness/support/assert.mjs`. Depends on: T012.
-- [ ] T014 [US2] In `assertScratch()`'s per-record matrix loop
+- [X] T014 [US2] In `assertScratch()`'s per-record matrix loop
       (`tests/harness/support/assert.mjs:89-99`), route entries with `requiresWire: true` to a
       `blocked` verdict (reason: `transport: WebFetch upgrades http→https; 005 R8`) instead of
       pass/fail when `--wire` is `isolated`; assert them normally (existing pass/fail logic) when
       `--wire live`. Depends on: T013.
-- [ ] T015 [US2] In `tests/harness/run.mjs`'s `writeReport()`, add a `blocked` verdict to the
+- [X] T015 [US2] In `tests/harness/run.mjs`'s `writeReport()`, add a `blocked` verdict to the
       rendered report as its own section with reasons, and add `blocked` to the summary counts line
       (`pass N · blocked M · expected-red K · unexpected-red 0`); confirm the exit-code computation
       stays driven only by `unexpected-red.length`. Depends on: T014.
-- [ ] T016 [US2] Run `npm run harness` (node layer) and one full isolated session run
-      (`--prep`/`--serve`/`--assert --wire isolated`); confirm the report shows zero
-      `unexpected-red`, with the three ATS cases listed under `blocked`. Depends on: T011, T015.
-- [ ] T017 [US2] For any `unexpected-red` T016 surfaces beyond F2/R3 — spec's "suspected members"
+- [X] T016 [US2] **DONE 2026-09-14, both halves.** Node-layer: `npm run harness` — 60/60 pass, 0
+      unexpected-red, 0 expected-red, 0 blocked. Session half: 3 live isolated session runs via
+      the Workflow tool (run 1 interrupted mid-run by a session-quota limit, resumed after reset;
+      run 1/resume surfaced F4+F5 below; run 3 post-fix — 83/83 agents, 0 errors — clean: 5 pass,
+      3 blocked (the ATS cases, correctly), 0 unexpected-red. `--assert --service-origin` used for
+      the isolation fallback per F3's established mitigation (scratch had no `--access-log`
+      requests to log since the wire never reached the service, matching R8).
+- [X] T017 [US2] **DONE 2026-09-14** — two `unexpected-red` findings from the live session runs,
+      both fixed and re-verified clean on run 3 (see `intake.md` F4/F5): F4
+      (`write-evaluation` dropped its leading `---` on 2/9 records — a genuine raw-passthrough
+      regression per the spec's suspected-members list, root-caused via reproducible same-prompt
+      retry, fixed with explicit BEGIN/END content markers) and F5 (`isolation:service-log-covers`
+      didn't exempt `requiresWire` records, making it permanently red on every isolated run — the
+      R3 fix missed this second check site). Also null-guarded the shape-check/ack helpers against
+      a failed `agent()` call resolving `null` (observed live during the quota interruption). For
+      any `unexpected-red` T016 surfaces beyond F2/R3 — spec's "suspected members"
       list (verbatim-echo/raw-passthrough regressions, batched-read resurfacing, blocking
       citation-audit behavior, ATS override-map handling, worker-presence/registration gaps of the
       run-2 class) — add one task per confirmed red here and fix it, strictly bounded to the failing
@@ -169,18 +192,38 @@ with evidence links; each of T025/T033/T038/T044 is checked or annotated
 
 ### Implementation for User Story 3
 
-- [ ] T018 [US3] Session run: ~100 non-terminal fixture records (duplicate the matrix with renamed
+- [ ] T018 [US3] **PENDING — needs a live Claude Code session, and flagged for a cost check
+      first.** A naive linear extrapolation from run 3's clean timing (9 records / 780s) puts
+      ~100 records at ~144 minutes — well over the 30-minute SC-014 budget, though that
+      extrapolation likely doesn't hold (parallel `pipeline()` scoring, fixed per-record verify
+      overhead, and Workflow-tool scheduling all mean it's not linear). Worth a real run to get an
+      honest number, but each session run already costs ~80-90 agents / ~700k tokens / 10-13 min
+      at 9 records, and today's session already hit its usage limit once — do not launch a 100-
+      record run without confirming the cost is acceptable first. Session run: ~100 non-terminal
+      fixture records (duplicate the matrix with renamed
       keys if the existing fixture set is smaller), production pacing; measure wall-clock and confirm
       under 30 minutes with a complete summary (004 SC-014). Depends on: Phase 3 + Phase 4 checkpoints
       (fixes must be live before the smoke run is representative).
-- [ ] T019 [P] [US3] Check whether `tests/fixtures/live/job-records/` (the Figma posting) has rotted
-      (posting closed); refresh with a currently-live posting or retire the fixture per spec Edge
-      Cases — independent of the isolated harness, must not block Phase 3/4.
-- [ ] T020 [US3] In `specs/004-retrieval-fit-screen-rework/tasks.md`, annotate T025, T033, T038, T044
-      each as done or `superseded by 005 case <case-name>`, citing the specific harness case that now
-      covers each manual validation. Depends on: T010, T016 (need the harness green to cite real case
-      names).
-- [ ] T021 [US3] Record the B1 vs B2 Phase B decision with reasons in
+- [X] T019 [P] [US3] **Done 2026-09-14** — checked: README claims live as of 2026-09-13, and
+      `intake.md` F1 records a second live re-confirmation the same day (2026-09-14, direct
+      `hyppo-verify` call returned `signal: found`). Fresh; no refresh needed today. Check whether
+      `tests/fixtures/live/job-records/` (the Figma posting) has rotted (posting closed); refresh
+      with a currently-live posting or retire the fixture per spec Edge Cases — independent of the
+      isolated harness, must not block Phase 3/4.
+- [X] T020 [US3] **Done 2026-09-14** (ahead of T010/T016's session half — the node-layer harness
+      case names were already stable and sufficient to cite): T025, T033, T038 annotated
+      superseded-by-harness-case in `specs/004-retrieval-fit-screen-rework/tasks.md` (citing
+      `score-cited-rows`/`citation-advisory`/`evidence-single-read`; `flapping`/`verify-signal`;
+      `applications-presence` respectively — with the genuinely-live-only slice of T033 called out
+      as still needing a human session). T044 confirmed **NOT superseded** (zero `namedOutcome`
+      hits anywhere under `tests/harness/`) — still needs a human run, flagged as a candidate
+      future 005/006 case, out of scope here per FR-004. In
+      `specs/004-retrieval-fit-screen-rework/tasks.md`, annotate T025, T033, T038, T044 each as done
+      or `superseded by 005 case <case-name>`, citing the specific harness case that now covers each
+      manual validation.
+- [ ] T021 [US3] **PENDING T018** (needs its wall-clock evidence + the full session-validation
+      picture from T010/T016 to make a real B1/B2 call, not a guess). Record the B1 vs B2 Phase B
+      decision with reasons in
       `specs/004-retrieval-fit-screen-rework/plan.md`'s phasing table (T053); check off T049 and T050
       in `specs/004-retrieval-fit-screen-rework/tasks.md` with evidence links to the harness report
       and T018's smoke-run numbers. Depends on: T018, T020.
@@ -191,12 +234,15 @@ with evidence links; each of T025/T033/T038/T044 is checked or annotated
 
 ## Phase 6: Polish & Cross-Cutting Concerns
 
-- [ ] T022 [P] Update `specs/006-fit-screen-gap-fixes/intake.md`: mark F1 (already closed), F2, F3,
-      and the T024 red as closed with links to the fix commits — keep it as the historical record per
-      the file's own header convention (don't delete, annotate).
-- [ ] T023 [P] Run `npm run harness` once more end-to-end (node layer + a final isolated session
-      `--assert`) as the SC-001 exit gate before closing the branch: all `pass`, zero
-      `unexpected-red`, zero `expected-red`.
+- [X] T022 [P] **Done 2026-09-14** (commit links to be added once this lands — see git history for
+      the actual SHAs). Update `specs/006-fit-screen-gap-fixes/intake.md`: mark F1 (already closed),
+      F2, F3, and the T024 red as closed with links to the fix commits — keep it as the historical
+      record per the file's own header convention (don't delete, annotate).
+- [~] T023 [P] **Node-layer half DONE 2026-09-14** — 59/59 pass, 0 unexpected-red, 0 expected-red,
+      0 blocked. **Session half PENDING** (same live-session dependency as T010/T016/T018). Run
+      `npm run harness` once more end-to-end (node layer + a final isolated session `--assert`) as
+      the SC-001 exit gate before closing the branch: all `pass`, zero `unexpected-red`, zero
+      `expected-red`.
 
 ---
 

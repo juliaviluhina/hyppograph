@@ -66,15 +66,19 @@ function parseSummary(text) {
   };
 }
 
-// Full check. Returns { cases, isolationProof } per contracts/harness-report.md.
+// Full check. Returns { cases, isolationProof } per contracts/harness-report.md, amended by
+// 006 contracts/harness-report-amendment.md for the `blocked` verdict.
 // `expectations` defaults to SIGNAL_EXPECTATIONS; the flapping case (T021) passes
 // a flipped map for the post-flip run. `serviceOrigin` enables the live-service
 // access-log fallback when the JSONL file is missing (yesterday's lesson: the
 // service must run WITH --access-log, else assert pulls GET /__admin/access-log).
-export async function assertScratch(dir, accessLogFile, expectations = SIGNAL_EXPECTATIONS, serviceOrigin = null) {
+// `wire` ("isolated" default | "live") — 006 R3: expectations with `requiresWire: true` report
+// `blocked` (not pass/fail) when isolated; asserted normally when live.
+export async function assertScratch(dir, accessLogFile, expectations = SIGNAL_EXPECTATIONS, serviceOrigin = null, wire = "isolated") {
   const cases = [];
   const fail = (name, note) => cases.push({ name, verdict: "unexpected-red", note });
   const pass = (name) => cases.push({ name, verdict: "pass" });
+  const blocked = (name, note) => cases.push({ name, verdict: "blocked", note });
 
   let records;
   try {
@@ -86,8 +90,14 @@ export async function assertScratch(dir, accessLogFile, expectations = SIGNAL_EX
   const evalVerdicts = readEvaluations(dir);
 
   // T010 — per-record matrix on the signal fixtures.
+  // 006 R3 — requiresWire entries report `blocked` (not pass/fail) on an isolated run: the wire
+  // (WebFetch upgrades http->https, 005 R8) cannot be exercised from loopback.
   for (const [key, exp] of Object.entries(expectations)) {
     const name = `matrix:${key}`;
+    if (exp.requiresWire && wire !== "live") {
+      blocked(name, "transport: WebFetch upgrades http→https; 005 R8");
+      continue;
+    }
     const rec = records[key];
     if (!rec) { fail(name, "job record missing from scratch dir"); continue; }
     if (rec.openStatus !== exp.mark) { fail(name, `mark is ${rec.openStatus ?? "null"}, expected ${exp.mark}`); continue; }
@@ -141,6 +151,10 @@ export async function assertScratch(dir, accessLogFile, expectations = SIGNAL_EX
     for (const [key, rec] of Object.entries(records)) {
       // Terminal records are never re-fetched: no service-log entry expected.
       if (expectations[key]?.rechecked === false) continue;
+      // 006 T017/R3 — a requiresWire record cannot have reached the service on an isolated run
+      // (the same wire gap the matrix loop reports as `blocked`); expecting its log entry here
+      // would make this check permanently red for exactly the reason R3 exists to name honestly.
+      if (expectations[key]?.requiresWire && wire !== "live") continue;
       const prod = buildAtsApiUrl(rec.__sourceRefs ?? [], {});
       if (prod) expectedPaths.push(new URL(prod).pathname);
     }
