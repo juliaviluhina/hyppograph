@@ -78,10 +78,10 @@ function verdictOf(cases, name) {
   return cases.find((c) => c.name === name)?.verdict;
 }
 
-test("full-flow: good session-shaped scratch passes everything", () => {
+test("full-flow: good session-shaped scratch passes everything", async () => {
   const s = goodScratch();
   try {
-    const { cases, isolationProof } = assertScratch(s.dir, s.alog);
+    const { cases, isolationProof } = await assertScratch(s.dir, s.alog);
     assert.ok(cases.length > 0);
     assert.deepEqual(cases.filter((c) => c.verdict !== "pass"), [], JSON.stringify(cases, null, 2));
     assert.ok(isolationProof.atsCallsInServiceLog >= ATS_PATHS.length);
@@ -90,22 +90,22 @@ test("full-flow: good session-shaped scratch passes everything", () => {
   }
 });
 
-test("full-flow: wrong verdict fails its matrix case", () => {
+test("full-flow: wrong verdict fails its matrix case", async () => {
   const s = goodScratch();
   try {
     writeEval(s.dir, "acme--backend-engineer--remote-eu", "SKIP");
-    const { cases } = assertScratch(s.dir, s.alog);
+    const { cases } = await assertScratch(s.dir, s.alog);
     assert.equal(verdictOf(cases, "matrix:acme--backend-engineer--remote-eu"), "unexpected-red");
   } finally {
     s.cleanup();
   }
 });
 
-test("full-flow: missing evaluation fails; evaluation on closed fails twice", () => {
+test("full-flow: missing evaluation fails; evaluation on closed fails twice", async () => {
   let s = goodScratch();
   try {
     fs.rmSync(path.join(s.dir, "outputs", "evaluations", "acme--backend-engineer--remote-eu.md"));
-    const { cases } = assertScratch(s.dir, s.alog);
+    const { cases } = await assertScratch(s.dir, s.alog);
     assert.equal(verdictOf(cases, "matrix:acme--backend-engineer--remote-eu"), "unexpected-red");
   } finally {
     s.cleanup();
@@ -113,7 +113,7 @@ test("full-flow: missing evaluation fails; evaluation on closed fails twice", ()
   s = goodScratch();
   try {
     writeEval(s.dir, "initech--backend-engineer--remote-eu", "SKIP");
-    const { cases } = assertScratch(s.dir, s.alog);
+    const { cases } = await assertScratch(s.dir, s.alog);
     assert.equal(verdictOf(cases, "matrix:initech--backend-engineer--remote-eu"), "unexpected-red");
     assert.equal(verdictOf(cases, "summary:no-eval-on-closed"), "unexpected-red");
   } finally {
@@ -121,11 +121,11 @@ test("full-flow: missing evaluation fails; evaluation on closed fails twice", ()
   }
 });
 
-test("full-flow: summary mismatch and missing summary fail", () => {
+test("full-flow: summary mismatch and missing summary fail", async () => {
   let s = goodScratch();
   try {
     writeSummary(s.dir, { o: 2, c: 2, u: 6, scored: 999, skip: 3, mid: 0, apply: 5 });
-    const { cases } = assertScratch(s.dir, s.alog);
+    const { cases } = await assertScratch(s.dir, s.alog);
     assert.equal(verdictOf(cases, "summary:scored-matches-files"), "unexpected-red");
   } finally {
     s.cleanup();
@@ -133,32 +133,32 @@ test("full-flow: summary mismatch and missing summary fail", () => {
   s = goodScratch();
   try {
     fs.rmSync(path.join(s.dir, "outputs", "last-run-summary-fit-screen.md"));
-    const { cases } = assertScratch(s.dir, s.alog);
+    const { cases } = await assertScratch(s.dir, s.alog);
     assert.equal(verdictOf(cases, "summary:present"), "unexpected-red");
   } finally {
     s.cleanup();
   }
 });
 
-test("full-flow: incomplete access log and missing log file fail isolation", () => {
+test("full-flow: incomplete access log and missing log file fail isolation", async () => {
   let s = goodScratch();
   try {
     writeAccessLog(s.alog, ATS_PATHS.slice(0, 2));
-    const { cases } = assertScratch(s.dir, s.alog);
+    const { cases } = await assertScratch(s.dir, s.alog);
     assert.equal(verdictOf(cases, "isolation:service-log-covers"), "unexpected-red");
   } finally {
     s.cleanup();
   }
   s = goodScratch();
   try {
-    const { cases } = assertScratch(s.dir, path.join(s.dir, "nope.jsonl"));
+    const { cases } = await assertScratch(s.dir, path.join(s.dir, "nope.jsonl"));
     assert.equal(verdictOf(cases, "isolation:access-log"), "unexpected-red");
   } finally {
     s.cleanup();
   }
 });
 
-test("--prep prints a valid session instruction block", () => {
+test("--prep prints a valid session instruction block", async () => {
   const r = spawnSync(process.execPath, [RUN, "--prep"], { encoding: "utf8" });
   assert.equal(r.status, 0, r.stderr);
   const block = JSON.parse(r.stdout);

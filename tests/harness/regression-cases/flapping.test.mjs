@@ -60,12 +60,12 @@ function postFlipScratch() {
   return { ...s, alog };
 }
 
-test("flapping: post-flip scratch passes flipped expectations, fails default ones", () => {
+test("flapping: post-flip scratch passes flipped expectations, fails default ones", async () => {
   const s = postFlipScratch();
   try {
-    const flipped = assertScratch(s.dir, s.alog, FLIPPED);
+    const flipped = await assertScratch(s.dir, s.alog, FLIPPED);
     assert.deepEqual(flipped.cases.filter((c) => c.verdict !== "pass"), [], JSON.stringify(flipped.cases, null, 2));
-    const def = assertScratch(s.dir, s.alog);
+    const def = await assertScratch(s.dir, s.alog);
     assert.equal(
       def.cases.find((c) => c.name === "matrix:umbrella--backend-engineer--remote-eu")?.verdict,
       "unexpected-red"
