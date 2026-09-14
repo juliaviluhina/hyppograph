@@ -1,0 +1,147 @@
+{
+  "version": 1,
+  "sections": {
+    "candidateBasics": {
+      "status": "answered",
+      "value": {
+        "displayName": "Test Candidate",
+        "contactLine": null
+      },
+      "profileFileExists": false
+    },
+    "locations": {
+      "status": "answered",
+      "value": {
+        "preferred": [
+          "Remote (EU)",
+          "Berlin"
+        ],
+        "excluded": [
+          "Onsite USA"
+        ]
+      }
+    },
+    "workArrangement": {
+      "status": "answered",
+      "value": {
+        "preference": "remote-or-hybrid",
+        "onSiteTolerance": null
+      }
+    },
+    "compensation": {
+      "status": "skipped",
+      "value": {
+        "floor": 0,
+        "target": null,
+        "currency": "EUR",
+        "benchmarkNotes": null
+      }
+    },
+    "hardStops": {
+      "status": "answered",
+      "value": {
+        "excludedLocations": [
+          "United States (on-site)",
+          "India"
+        ],
+        "lackedClearances": [
+          "US Security Clearance (TS/SCI)"
+        ],
+        "lackedWorkAuth": [],
+        "visaSponsorshipRequired": true
+      }
+    },
+    "directions": {
+      "status": "answered",
+      "value": [
+        {
+          "name": "AI Engineering",
+          "description": "Applied AI / LLM engineering roles: building products on top of foundation models, RAG pipelines, agent frameworks, prompt/eval infrastructure, inference serving. Python or TypeScript.",
+          "materialsPath": "directions/ai-engineering/"
+        },
+        {
+          "name": "Test Automation",
+          "description": "Senior SDET / test automation architect roles: end-to-end and API test frameworks, CI test infrastructure, Playwright/Selenium, quality strategy for engineering orgs.",
+          "materialsPath": "directions/test-automation/"
+        }
+      ]
+    },
+    "trackedBoards": {
+      "status": "answered",
+      "value": [
+        {
+          "name": "WeWorkRemotely — AI",
+          "filteredSearch": "https://boards.example.com/weworkremotely/search?term=AI+engineer",
+          "depth": 3
+        },
+        {
+          "name": "Himalayas — AI Engineer",
+          "filteredSearch": "https://boards.example.com/himalayas/jobs/ai-engineer",
+          "depth": 2
+        },
+        {
+          "name": "Broken board (empty search)",
+          "filteredSearch": "",
+          "depth": 5
+        }
+      ]
+    },
+    "collectionTuning": {
+      "status": "answered",
+      "value": {
+        "pacingMs": 3000,
+        "fetchCap": 300,
+        "defaultDepth": 25
+      }
+    },
+    "scoringWeightNotes": {
+      "status": "skipped",
+      "value": {
+        "text": ""
+      }
+    },
+    "evidenceBase": {
+      "status": "answered",
+      "value": {
+        "files": [
+          "inputs/evidence/career-history.md",
+          "inputs/evidence/cv-content.md"
+        ]
+      }
+    },
+    "hardConstraints": {
+      "status": "answered",
+      "value": {
+        "compFloor": {
+          "amount": 90000,
+          "currency": "EUR"
+        },
+        "excludedRoleNatures": [
+          "on-call rotation"
+        ]
+      }
+    },
+    "targetRoles": {
+      "status": "answered",
+      "value": {
+        "streams": [
+          {
+            "name": "AI Engineering",
+            "seniorityCeiling": "staff",
+            "description": "Applied AI / LLM engineering roles: building products on top of foundation models, RAG pipelines, agent frameworks, prompt/eval infrastructure, inference serving."
+          },
+          {
+            "name": "Test Automation",
+            "seniorityCeiling": "principal",
+            "description": "Senior SDET / test automation architect roles: end-to-end and API test frameworks, CI test infrastructure, quality strategy for engineering orgs."
+          }
+        ]
+      }
+    }
+  },
+  "completeness": {
+    "setupReady": true,
+    "unresolved": []
+  },
+  "$comment": "Fixture for spec 004 quickstart scenario 10 / SC-012 / T002: targetRoles.recencyWindowYears deliberately missing. Expect: fit-screen.js reports config.evidence-unavailable naming the missing field and makes zero writes."
+}

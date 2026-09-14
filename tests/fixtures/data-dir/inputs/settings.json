@@ -69,6 +69,27 @@
     "scoringWeightNotes": {
       "status": "skipped",
       "value": { "text": "" }
+    },
+    "evidenceBase": {
+      "status": "answered",
+      "value": { "files": ["inputs/evidence/career-history.md", "inputs/evidence/cv-content.md"] }
+    },
+    "hardConstraints": {
+      "status": "answered",
+      "value": {
+        "compFloor": { "amount": 90000, "currency": "EUR" },
+        "excludedRoleNatures": ["on-call rotation"]
+      }
+    },
+    "targetRoles": {
+      "status": "answered",
+      "value": {
+        "streams": [
+          { "name": "AI Engineering", "seniorityCeiling": "staff", "description": "Applied AI / LLM engineering roles: building products on top of foundation models, RAG pipelines, agent frameworks, prompt/eval infrastructure, inference serving." },
+          { "name": "Test Automation", "seniorityCeiling": "principal", "description": "Senior SDET / test automation architect roles: end-to-end and API test frameworks, CI test infrastructure, quality strategy for engineering orgs." }
+        ],
+        "recencyWindowYears": 4
+      }
     }
   },
   "completeness": {

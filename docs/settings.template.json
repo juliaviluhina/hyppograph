@@ -1,0 +1,88 @@
+{
+  "$comment": "Fabricated-persona settings.json template (FR-000a, spec 004). Every value here is invented — no real personal data. Copy this file to <HYPPO_DATA_DIR>/inputs/settings.json and edit every value to bootstrap a new data directory without reading the schemas or fixtures first (SC-013). Covers feature 001's original sections plus feature 004's additions (evidenceBase, hardConstraints, targetRoles).",
+  "version": 1,
+  "sections": {
+    "candidateBasics": {
+      "status": "answered",
+      "value": { "displayName": "Jordan Example", "contactLine": "jordan@example.com" },
+      "profileFileExists": false
+    },
+    "locations": {
+      "status": "answered",
+      "value": { "preferred": ["Remote (EU)", "Berlin"], "excluded": ["Onsite USA"] }
+    },
+    "workArrangement": {
+      "status": "answered",
+      "value": { "preference": "remote-or-hybrid", "onSiteTolerance": null }
+    },
+    "compensation": {
+      "status": "answered",
+      "value": { "floor": 90000, "target": 110000, "currency": "EUR", "benchmarkNotes": null }
+    },
+    "hardStops": {
+      "status": "answered",
+      "value": {
+        "excludedLocations": ["United States (on-site)"],
+        "lackedClearances": ["US Security Clearance (TS/SCI)"],
+        "lackedWorkAuth": [],
+        "visaSponsorshipRequired": false
+      }
+    },
+    "directions": {
+      "status": "answered",
+      "value": [
+        {
+          "name": "Example Direction",
+          "description": "Replace with a real considered-direction description: what kind of role this is, in enough detail that a fast-tier pre-triage gate can judge coarse overlap.",
+          "materialsPath": "directions/example-direction/"
+        }
+      ]
+    },
+    "trackedBoards": {
+      "status": "answered",
+      "value": [
+        {
+          "name": "Example board",
+          "filteredSearch": "https://boards.example.com/some-board/search?term=example",
+          "depth": 10
+        }
+      ]
+    },
+    "collectionTuning": {
+      "status": "answered",
+      "value": { "pacingMs": 3000, "fetchCap": 300, "defaultDepth": 25 }
+    },
+    "scoringWeightNotes": {
+      "status": "skipped",
+      "value": { "text": "" }
+    },
+    "evidenceBase": {
+      "status": "answered",
+      "value": { "files": ["inputs/evidence/career-history.md", "inputs/evidence/cv-content.md"] }
+    },
+    "hardConstraints": {
+      "status": "answered",
+      "value": {
+        "compFloor": { "amount": 90000, "currency": "EUR" },
+        "excludedRoleNatures": ["on-call rotation"]
+      }
+    },
+    "targetRoles": {
+      "status": "answered",
+      "value": {
+        "streams": [
+          {
+            "name": "Example Stream",
+            "seniorityCeiling": "staff",
+            "description": "Replace with a real target-role stream description used by the seniority-band and title-check logic."
+          }
+        ],
+        "recencyWindowYears": 4
+      }
+    }
+  },
+  "completeness": {
+    "setupReady": true,
+    "unresolved": []
+  }
+}

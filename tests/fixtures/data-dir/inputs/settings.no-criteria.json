@@ -18,7 +18,18 @@
       ]
     },
     "collectionTuning": { "status": "skipped", "value": { "pacingMs": 3000, "fetchCap": 300, "defaultDepth": 25 } },
-    "scoringWeightNotes": { "status": "skipped", "value": { "text": "" } }
+    "scoringWeightNotes": { "status": "skipped", "value": { "text": "" } },
+    "evidenceBase": { "status": "answered", "value": { "files": ["inputs/evidence/career-history.md", "inputs/evidence/cv-content.md"] } },
+    "hardConstraints": { "status": "answered", "value": { "compFloor": null, "excludedRoleNatures": [] } },
+    "targetRoles": {
+      "status": "answered",
+      "value": {
+        "streams": [
+          { "name": "AI Engineering", "seniorityCeiling": "staff", "description": "Applied AI / LLM engineering roles." }
+        ],
+        "recencyWindowYears": 4
+      }
+    }
   },
   "completeness": { "setupReady": true, "unresolved": [] }
 }
