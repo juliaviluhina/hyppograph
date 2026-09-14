@@ -62,6 +62,14 @@ spec-005 exit code `0`.
    complete, **Then** all N are `pass` and no previously-passing case regressed.
 2. **Given** a proposed fix with no failing harness case behind it, **When** it is reviewed,
    **Then** it is rejected — out of scope for this spec (new behavior needs its own spec).
+3. **Given** a run whose summary write returns a false ack, **When** the flow handles it,
+   **Then** it retries once via the single writer and, on persistent failure, logs loudly
+   with the full summary attached — the on-disk summary always carries the run
+   (`contracts/summary-write.md`; intake F2).
+4. **Given** an isolated session run where the three `requiresWire` expectations cannot
+   exercise the wire, **When** the report is produced, **Then** they show `blocked` with
+   the R8 reason — counted in neither pass nor fail, exit code unaffected
+   (`contracts/harness-report-amendment.md`).
 
 ---
 
@@ -113,6 +121,9 @@ T025/T033/T038/T044 is either checked or annotated "superseded by 005 case X."
 - **FR-005**: Complete 004 T049/T050/T053 with evidence; annotate T025/T033/T038/T044 as done or
   superseded-by-harness-case.
 - **FR-006**: Record the B1/B2 Phase B decision with reasons in 004 plan.md's phasing table.
+- **FR-007**: The run summary MUST be written via the single-writer protocol
+  (`contracts/summary-write.md`): `hyppo-readwrite`, ack checked, one retry, loud log
+  on persistent failure — never a silent `false`.
 
 ### Key Entities
 
