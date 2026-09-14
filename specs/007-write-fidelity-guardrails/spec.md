@@ -41,6 +41,26 @@ it. Static source-code pins cannot catch this; only exercising the real prompt a
 call can — and that currently costs a full session run (~80-90 agents, ~700k tokens, 10-13 minutes
 in this environment) to even notice.
 
+## Audit findings (2026-09-14) — FR-002 completed at spec time
+
+Every `agent()` call in both workflow scripts that writes file content was inspected. Eight sites
+total; three shapes:
+
+| # | File : line | Call (label) | Shape | Classification | Reason |
+|---|---|---|---|---|---|
+| 1 | `fit-screen.js`, `buildEvaluationWritePrompt` (`write-evaluation`) | `write-evaluation` | Full overwrite, multi-line, content begins `---\n` | **At-risk — confirmed broken (F4), already fixed** | Model dropped the leading `---` on 2/9 live records; fixed on branch `006-fit-screen-gap-fixes` (commit `66c8e32`, not yet on `main`) with `BEGIN-CONTENT`/`END-CONTENT` markers. Needs FR-001's atomic regression test. Line numbers throughout this table are as of that commit — **this spec's implementation depends on 006 merging (or being rebased onto 006) first** (see Assumptions). |
+| 2 | `fit-screen.js:1023` (branch `006-fit-screen-gap-fixes`, commit `66c8e32`) | `write-run-summary` | Full overwrite, multi-line, content = `renderSummary()`, first line always `Run <timestamp>` | **At-risk in principle, not yet guarded** | Same blank-line-then-content boundary shape as #1. Currently safe only because `renderSummary`'s first line happens to start with a letter, not because anything enforces it (spec Edge Cases). No incident observed yet — FR-003 target. |
+| 3 | `intake-normalize.js:841` | `write-run-summary` (001's) | Full overwrite, multi-line, content = `renderSummary()`, first line always `Run <timestamp>` | **At-risk in principle, not yet guarded** | Same as #2, feature 001's counterpart. Never audited before this spec. FR-003 target. |
+| 4 | `fit-screen.js:502` | `write-open-status` | Patch: "Update ONLY the YAML front-matter... leave body BYTE-FOR-BYTE unchanged" + a short list of keys/values to set | **Out-of-class** | The model composes the edit from instructions, not transcribes a literal blob — no instruction/content boundary to collide with. Different bug class (possible over-edit or key-drop), not this spec's scope. |
+| 5 | `fit-screen.js:757` (branch `006-fit-screen-gap-fixes`) | `migrate-application-state` | Same patch shape as #4 | **Out-of-class** | Same reason as #4. |
+| 6 | `intake-normalize.js:605` | `write-triage-mark` | Same patch shape as #4 | **Out-of-class** | Same reason as #4. |
+| 7 | `fit-screen.js:851` (branch `006-fit-screen-gap-fixes`) | `provenance` (`appendProvenance`) | Append exactly one single-line string, no embedded newline | **Out-of-class** | A single appended line has no multi-line body and no leading-delimiter boundary — the collision this spec addresses is structurally impossible here. |
+| 8 | `intake-normalize.js:1176` | `provenance` (`appendProvenance`) | Same append shape as #7 | **Out-of-class** | Same reason as #7. |
+
+**Net scope for US1/US3**: 3 at-risk call sites total (#1 already fixed and needing only its
+regression test; #2 and #3 needing both the marker fix and a new atomic test). 4 out-of-class sites
+recorded with reasons, not touched by this spec.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Catch write-fidelity drift at the cost of one fast-tier call, not a full session run (Priority: P1)
@@ -73,31 +93,29 @@ model. The new atomic test fails, naming the exact byte mismatch, in under the t
 
 ---
 
-### User Story 2 - Audit every other verbatim-write prompt for the same collision shape (Priority: P2)
+### User Story 2 - Fix the two at-risk call sites the audit found beyond F4 (Priority: P2)
 
-Beyond the one call site 006 fixed, find every other prompt in `fit-screen.js` and
-`intake-normalize.js` that asks a fast-tier agent to transcribe content verbatim, and determine
-which share the same "blank line then content" boundary shape that made F4 possible.
+The audit (above, completed at spec time) found two more call sites sharing F4's exact boundary
+shape — both `write-run-summary` prompts, in `fit-screen.js` and `intake-normalize.js` — that have
+not yet failed only because their content's first line happens to be safe today, not because
+anything guarantees it.
 
 **Why this priority**: F4 was found by accident (a live session run happened to hit it on 2 of 9
-records). The same shape exists at other call sites that have simply not yet been exercised with
-content starting in a collision-prone character. Fixing only the one instance already hit leaves
-the class open.
+records, on the one site that happened to have risky content). The audit shows the same shape
+exists at two more sites that have simply not yet been exercised with unsafe content. Fixing only
+the instance already hit leaves the class open at the other two.
 
-**Independent Test**: A completed audit table (this spec's Key Entities) enumerating every
-"write this exact content" and "write this exact text" call site in both workflow scripts, its
-current content shape, and whether it is at-risk, already-guarded, or out-of-class (e.g. a
-single-line append, or a patch to an existing file rather than a full overwrite).
+**Independent Test**: Both `write-run-summary` prompts (audit #2, #3) wrapped in
+`BEGIN-CONTENT`/`END-CONTENT` markers matching #1's already-shipped fix, each with its own
+FR-001-style atomic test passing.
 
 **Acceptance Scenarios**:
 
-1. **Given** the audit table, **When** a call site's typical content could plausibly start with a
-   collision-prone character (even if it happens not to today), **Then** it gets the same
-   `BEGIN-CONTENT`/`END-CONTENT` treatment as a defensive measure, and a matching atomic test from
-   US1.
-2. **Given** a call site that only ever appends one line or patches an existing file's front-matter
-   keys in place, **When** the audit classifies it, **Then** it is recorded out-of-class with the
-   reason (this spec does not invent new risk where the shape doesn't apply).
+1. **Given** audit sites #2 and #3, **When** the marker fix lands, **Then** each gets its own
+   atomic test (US1's pattern) proving byte-exact output, run against the real model.
+2. **Given** the four out-of-class sites (#4-#8) recorded with reasons, **When** this story is
+   scoped, **Then** none of them are touched — this spec does not invent new risk where the audited
+   shape doesn't apply.
 
 ---
 
@@ -140,17 +158,21 @@ regression at the free, node-only tier even before US1's atomic test would.
 ### Functional Requirements
 
 - **FR-001**: An atomic (single real fast-tier `agent()` call, no fixture service, no full pipeline)
-  test MUST exist that exercises `fit-screen.js`'s `write-evaluation` prompt shape and asserts
-  byte-exact output including the leading front-matter delimiter — regression-proofing F4.
-- **FR-002**: A completed audit (Key Entities: Verbatim-Write Call Site) MUST enumerate every
-  "write this exact content/text" and "APPEND exactly one line" call site in both
-  `.claude/workflows/fit-screen.js` and `.claude/workflows/intake-normalize.js`, classified
-  at-risk / already-guarded / out-of-class with a stated reason for each.
-- **FR-003**: Every call site FR-002 classifies at-risk MUST get the `BEGIN-CONTENT`/`END-CONTENT`
-  (or equivalent unambiguous-boundary) treatment and a matching FR-001-style atomic test.
-- **FR-004**: A free, node-only structural pin MUST check that every verbatim-write prompt in both
-  scripts uses the marker convention, so a future regression is caught before a live session is
-  needed.
+  test MUST exist that exercises `fit-screen.js`'s `write-evaluation` prompt shape (audit #1) and
+  asserts byte-exact output including the leading front-matter delimiter — regression-proofing F4.
+- **FR-002**: DONE at spec time (see Audit findings above) — 8 call sites enumerated and classified:
+  3 at-risk (#1 fixed/needs test only, #2/#3 need both fix and test), 4 out-of-class with reasons.
+  Planning starts directly from this table; no further discovery needed.
+- **FR-003**: Audit sites #2 (`fit-screen.js:922` `write-run-summary`) and #3
+  (`intake-normalize.js:841` `write-run-summary`) MUST get the `BEGIN-CONTENT`/`END-CONTENT`
+  treatment (matching #1's already-shipped fix) and a matching FR-001-style atomic test each — even
+  though neither has an observed failure, both share #1's exact boundary shape (spec Edge Cases:
+  "not structurally guaranteed safe" counts as at-risk).
+- **FR-004**: A free, node-only structural pin (extend `tests/harness/support/structure.mjs`'s
+  existing pin convention, e.g. `hasRawSettingsPassthrough`) MUST check that all three at-risk call
+  sites (#1/#2/#3) use the marker convention, so a future regression there — or a new verbatim-write
+  prompt added without markers — is caught before a live session is needed. Out-of-class sites
+  #4-#8 get no pin (nothing to check).
 - **FR-005**: This spec MUST NOT change any scoring, verdict, verification, or persistence
   semantics — it is testing and prompt-formatting hardening only, matching 006's "no new pipeline
   behavior" discipline for anything touching production code paths.
@@ -189,3 +211,9 @@ regression at the free, node-only tier even before US1's atomic test would.
 - `intake-normalize.js`'s call sites are in scope for the audit (FR-002) even though its own fixes,
   if any are found at-risk, are a smaller addendum than fit-screen.js's — feature 001 predates this
   finding and was never audited for it.
+- **Branch dependency**: this spec branches from `main`, which does not yet contain 006's F4 fix
+  (that work lives on `006-fit-screen-gap-fixes`, commit `66c8e32`, not yet merged/PR'd at spec
+  time). Audit line numbers for `fit-screen.js` (#1, #2, #4, #5, #7) are as of that commit.
+  **Implementation (planning onward) should happen after 006 merges to `main`, or by rebasing this
+  branch onto 006's branch** — building US1's atomic test against #1 requires the BEGIN/END fix to
+  already exist to test against.

@@ -32,8 +32,9 @@
 ## Notes
 
 - Spec level only, same posture as 006 at its creation — grounded directly in a real, dated
-  finding (006's F4/F5, 2026-09-14) rather than a hypothetical. Planning (research.md/plan.md) is
-  the next stage once the audit (US2's Key Entity) needs enumerating in detail.
-- Deliberately no [NEEDS CLARIFICATION]: FR-002's audit is itself the mechanism that resolves any
-  ambiguity about which call sites are in scope — the spec doesn't need to guess the answer before
-  planning does the audit.
+  finding (006's F4/F5, 2026-09-14) rather than a hypothetical. Unlike 006, the audit (FR-002) was
+  completed at spec time (see "Audit findings" section) rather than deferred to planning — 3
+  at-risk call sites, 4 out-of-class, named and reasoned. `/speckit-plan` and `/speckit-tasks` can
+  run directly from this spec next session with no further discovery step.
+- Deliberately no [NEEDS CLARIFICATION]: the one open question a normal spec might defer (which
+  call sites are in scope) is already resolved by the completed audit table.
