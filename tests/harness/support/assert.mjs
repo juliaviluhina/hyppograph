@@ -7,6 +7,7 @@ import path from "node:path";
 import { SIGNAL_EXPECTATIONS } from "./expectations.mjs";
 import { buildAtsApiUrl } from "./pure.mjs";
 import { assertServiceLogCovers } from "./isolation.mjs";
+import { loadAccessLog } from "./fetch.mjs";
 
 // Tiny front-matter reader (workflow files only; not a YAML parser).
 export function readFrontMatter(file) {
@@ -67,8 +68,10 @@ function parseSummary(text) {
 
 // Full check. Returns { cases, isolationProof } per contracts/harness-report.md.
 // `expectations` defaults to SIGNAL_EXPECTATIONS; the flapping case (T021) passes
-// a flipped map for the post-flip run.
-export function assertScratch(dir, accessLogFile, expectations = SIGNAL_EXPECTATIONS) {
+// a flipped map for the post-flip run. `serviceOrigin` enables the live-service
+// access-log fallback when the JSONL file is missing (yesterday's lesson: the
+// service must run WITH --access-log, else assert pulls GET /__admin/access-log).
+export async function assertScratch(dir, accessLogFile, expectations = SIGNAL_EXPECTATIONS, serviceOrigin = null) {
   const cases = [];
   const fail = (name, note) => cases.push({ name, verdict: "unexpected-red", note });
   const pass = (name) => cases.push({ name, verdict: "pass" });
@@ -126,20 +129,28 @@ export function assertScratch(dir, accessLogFile, expectations = SIGNAL_EXPECTAT
   // T012 — isolation, session-run form: every ATS-derived mark must have a matching
   // local service-log request for its posting path (prod-API path == service path).
   let accessLog;
+  let logSource = "file";
   try {
-    accessLog = fs.readFileSync(accessLogFile, "utf8").split("\n").filter(Boolean).map((l) => JSON.parse(l));
+    ({ rows: accessLog, source: logSource } = await loadAccessLog({ file: accessLogFile, origin: serviceOrigin }));
   } catch (e) {
-    fail("isolation:access-log", `fixture service unreachable or access log missing (${e.message}) — tests never fall back to a live host`);
+    fail("isolation:access-log", e.message);
     return { cases, isolationProof: { atsCallsInServiceLog: "unknown", nonLoopbackTargetsObserved: "unknown" } };
   }
   try {
     const expectedPaths = [];
-    for (const rec of Object.values(records)) {
+    for (const [key, rec] of Object.entries(records)) {
+      // Terminal records are never re-fetched: no service-log entry expected.
+      if (expectations[key]?.rechecked === false) continue;
       const prod = buildAtsApiUrl(rec.__sourceRefs ?? [], {});
       if (prod) expectedPaths.push(new URL(prod).pathname);
     }
     assertServiceLogCovers(accessLog, expectedPaths);
-    pass("isolation:service-log-covers");
+    if (logSource === "service") {
+      pass("isolation:service-log-covers");
+      cases[cases.length - 1].note = "via live-service fallback (run the service WITH --access-log next time)";
+    } else {
+      pass("isolation:service-log-covers");
+    }
   } catch (e) {
     fail("isolation:service-log-covers", e.message);
   }

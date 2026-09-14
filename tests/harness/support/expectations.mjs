@@ -33,5 +33,6 @@ export const SIGNAL_EXPECTATIONS = {
   "hooli--closed-role--remote-eu": {
     mark: "confirmed-closed", // terminal: never re-checked, never scored
     evaluated: false,
+    rechecked: false, // terminal marks are never re-fetched: no service-log entry expected
   },
 };

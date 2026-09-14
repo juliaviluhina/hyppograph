@@ -41,3 +41,35 @@ export async function setScenario(path, scenario) {
     throw new Error(`scenario admin rejected ${path} -> ${scenario}: ${await admin.text()}`);
   }
 }
+
+// Access-log loading with live-service fallback: prefer the JSONL file (written
+// when the service runs with --access-log); if it is missing/unreadable and a
+// service origin is given, pull GET /__admin/access-log from the live service.
+// Throws the standard unreachable message when neither works.
+export async function loadAccessLog({ file, origin }) {
+  if (file) {
+    try {
+      const fs = await import("node:fs");
+      const rows = fs.readFileSync(file, "utf8").split("\n").filter(Boolean).map((l) => JSON.parse(l));
+      return { rows, source: "file" };
+    } catch {
+      // fall through to the live service when an origin is available
+    }
+  }
+  if (origin) {
+    const url = origin.replace(/\/+$/, "") + "/__admin/access-log";
+    try {
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(`status ${res.status}`);
+      return { rows: await res.json(), source: "service" };
+    } catch (e) {
+      throw new Error(
+        `fixture service unreachable and no access log at ${file ?? "(none)"} ` +
+          `(${e.cause?.code ?? e.message}) — tests never fall back to a live host`
+      );
+    }
+  }
+  throw new Error(
+    `fixture service unreachable or access log missing (${file ?? "(none)"}) — tests never fall back to a live host`
+  );
+}

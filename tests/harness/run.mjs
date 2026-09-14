@@ -23,7 +23,7 @@ const SCENARIOS = path.join(HERE, "scenarios.json");
 const REPORT = path.join(HERE, "last-report.md");
 
 function usage() {
-  console.log(`usage: run.mjs [test] [--case=name] | --serve [--port N] | --prep | --assert --dir <scratch> --access-log <file>`);
+  console.log(`usage: run.mjs [test] [--case=name] | --serve [--port N] | --prep | --assert --dir <scratch> --access-log <file> [--service-origin <origin>]`);
   process.exit(2);
 }
 
@@ -136,8 +136,10 @@ if (argv.includes("--serve")) {
 } else if (argv.includes("--assert")) {
   const dir = argv[argv.indexOf("--dir") + 1];
   const alog = argv[argv.indexOf("--access-log") + 1];
+  const soi = argv.indexOf("--service-origin");
+  const origin = soi >= 0 ? argv[soi + 1] : null;
   if (!dir || !alog) usage();
-  const { cases, isolationProof } = assertScratch(dir, alog);
+  const { cases, isolationProof } = await assertScratch(dir, alog, undefined, origin);
   process.exit(writeReport(cases, isolationProof));
 } else {
   // default: node test suite with managed service (T008 checkpoint: "no cases" is RED)
