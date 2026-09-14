@@ -101,3 +101,33 @@ skip-when-unchanged and any gap the regression cases expose); 005 owns the tests
 
 **Rationale**: Keeps the three specs' ownership clean: 005 = "prove it isolated", 006 = "fix what's
 proven broken", 003 = "eventual shared harness shape".
+
+---
+
+### R8 — Transport constraint: WebFetch upgrades http→https; the fixture service stays plain HTTP (answered 2026-09-14)
+
+**Finding** (discriminator experiment, F1): WebFetch unconditionally rewrites `http://` to
+`https://` before connecting — documented tool behavior, no request parameter changes it. The
+agent echoed the exact `http://127.0.0.1:8471/…` URL it was given; the tool silently upgraded it
+and the TLS handshake against the plaintext fixture service failed (`WRONG_VERSION_NUMBER`).
+The service access log held zero session-run requests, confirming nothing arrived as HTTP.
+
+**Decision**: Split the proof, don't fight the tool —
+- The loopback fixture service keeps serving plain HTTP and proves everything it can reach:
+  URL construction, scenario semantics, signal derivation, mark mapping, isolation, and all
+  session-shape assertions. No production change, no cert machinery, no new tool grants.
+- `hyppo-verify`'s wire behavior (its only tool doing its only job) is proven in-session
+  against a real `https://` ATS endpoint instead: the existing live smoke fixture
+  (`tests/fixtures/live/`, 004 T006) becomes the worker-transport proof. The scenario→signal
+  mapping it can't reach on loopback stays pinned by the node ground truth (T014) plus the
+  prompt contract.
+- Rejected: HTTPS fixture service with self-signed cert (WebFetch won't trust it; `mkcert` +
+  system store is machine-specific fragility, the opposite of zero-setup). Rejected: granting
+  hyppo-verify a second HTTP tool just for tests (expands the production allow-list for no
+  production reason — a Principle IV discussion, not a harness shortcut).
+
+**Consequence for 006**: F1's fix is documentation + a live-smoke session run, not code — unless
+006 chooses the tool-grant discussion deliberately. The flip test (T021 session half) stays
+meaningful: flipping works at the service level and the workflow's mark-update logic is
+transport-independent; run it against the live smoke record's real open/closed transitions
+only where possible, else assert the code path via the node halves.

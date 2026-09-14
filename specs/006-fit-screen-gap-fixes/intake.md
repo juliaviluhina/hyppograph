@@ -15,20 +15,17 @@ None from node. First real session run (2026-09-14T15:20:51Z, scratch asserted
 2026-09-14T15:38Z) produced 5 `unexpected-red` — three new production findings below.
 Artifacts: session summary in chat history; scratch dir was temp (deleted after assert).
 
-### F1 (new, P0): verify never reaches plain-HTTP endpoints — all ATS checks http_error
+### F1 (ANSWERED 2026-09-14): tool fault — WebFetch upgrades http→https unconditionally
 
-All 3 ATS records (acme/initech/umbrella) classified `unresolvable`: hyppo-verify's
-WebFetch hit an SSL `WRONG_VERSION_NUMBER` error against `http://127.0.0.1:8471`.
-Service access log proves ZERO session-run requests arrived as HTTP (log held only
-the test harness's own later entries). Prompt URL was byte-correct `http://` per the
-persisted `still_open_scan` delegation entries — the upgrade happened downstream.
-Open question for a discriminator experiment (see below): did the fast-tier agent
-rewrite `http` → `https` itself (runs-4–6 family), or does the WebFetch tool upgrade
-all `http://` to TLS? Until answered, the entire ATS verify path is UNPROVEN —
-note that 004's runs 1–9 never successfully exercised a live ATS check either
-(run 2's "verified" records were all non-ATS).
-Fix direction depends on the answer: exact-URL discipline in hyppo-verify.md +
-prompt (agent fault) vs rethink fixture transport (tool fault).
+Discriminator experiment result: the agent echoed the exact `http://127.0.0.1:8471/…` URL;
+WebFetch silently rewrote the scheme (documented tool behavior, no parameter changes it)
+and the TLS handshake failed. Service log held zero session requests. Design decision
+recorded in 005 research.md R8: split the proof — loopback service proves everything
+except the worker's wire behavior; `hyppo-verify` wire behavior is proven in-session
+against a real `https://` ATS endpoint (the `tests/fixtures/live/` smoke fixture).
+No code fix; no new tool grants. 006 action: run the live-smoke session check and
+document it; keep the cert/tool-grant options rejected unless deliberately reopened
+(Principle IV).
 
 ### F2 (new): write-run-summary silently not written — ack never checked
 
@@ -46,10 +43,12 @@ isolation assert initially failed on I/O, not signal. Mitigated in 005 same-day:
 GET `/__admin/access-log` (proves the fallback works — it pulled the log above).
 Keep the flag in all future session instructions anyway (file is the primary proof).
 
-## Flip test (T021 session half): BLOCKED until F1 is answered
+## Flip test (T021 session half): UNBLOCKED in revised form (R8)
 
-Flipping scenarios without a working verify path proves nothing. Order: F1
-experiment → re-run T013 green → then flip test.
+Flipping works at the service level and the mark-update logic is transport-independent;
+run the session flip against scenario flips and assert mark updates + untouched
+evaluations via --assert with flipped expectations. Worker wire proof comes separately
+from the live-smoke check above.
 
 ## Notes for 006 implementers
 

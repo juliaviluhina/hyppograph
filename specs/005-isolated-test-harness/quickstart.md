@@ -43,6 +43,10 @@ in-session halves pending (S).
 2. **Per-worker contracts (US2)**: break one worker fixture at a time (N: honesty/
    verbatim/single-read/presence/audit cases green; each fault class covered) — S: prompt
    each worker in-session and confirm the signal/verdicts agree with the node ground truth.
+   Transport note (research.md R8): `hyppo-verify` cannot reach the plain-HTTP fixture
+   service — WebFetch upgrades `http://` to `https://` unconditionally (proven 2026-09-14).
+   Its wire behavior is proven instead against a real `https://` ATS endpoint via the
+   live smoke fixture (`tests/fixtures/live/`); the loopback service pins everything else.
 3. **Service scenarios (US3)**: N: flip mechanics + fail-fast + wiring green. S: POST a
    `flapping` flip between two session runs; confirm the mark updates without disturbing
    the prior evaluation. Stop the service and confirm dependent cases fail fast
