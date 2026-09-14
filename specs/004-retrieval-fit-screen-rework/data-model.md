@@ -12,7 +12,7 @@ FR-004a). See research.md for the decisions behind the shapes below.
 
 | Field | Type | Notes |
 |---|---|---|
-| `files` | string[] | Paths relative to `HYPPO_DATA_DIR`, e.g. `evidence/career-history.md`. At least one required; each MUST resolve to non-empty content or the run reports `config.evidence-unavailable` (FR-000). |
+| `files` | string[] | Paths relative to `HYPPO_DATA_DIR`, e.g. `inputs/evidence/career-history.md`. At least one required; each MUST resolve to non-empty content or the run reports `config.evidence-unavailable` (FR-000). |
 
 ---
 
@@ -73,7 +73,7 @@ pre-triage.
 | `openStatus` | mirrors the Job Record's mark at scoring time | Denormalized for a self-contained evaluation file |
 | `overallVerdict` | `"SKIP"` \| `"APPLY-AND-SEE"` \| `"APPLY"` | FR-006 |
 | `requirementTable[]` | `{ requirement, verdict, evidenceFile, evidenceSection, note? }` | `verdict` ∈ `Strong`/`Partial`/`Fails`/`Absent`/`Unknown` (FR-003) |
-| `hardConstraints[]` | `{ constraint, state, note? }` | `state` ∈ pass/fail/`unresolved` (FR-004/FR-004a), reported separately from `requirementTable` |
+| `hardConstraints[]` | `{ constraint, state, likelyOutcome?, note? }` | `state` ∈ pass/fail/`unresolved` (FR-004/FR-004a), reported separately from `requirementTable`. `likelyOutcome` (∈ `likely-pass`/`likely-fail`/`even`) is present only when `state` is `unresolved` — the script uses it, never a free-form read of `note`, to decide between capping at `APPLY-AND-SEE` and forcing `SKIP` (research.md R11) |
 | `antiPatternFlags[]` | `{ type, detail }` | `type` ∈ `domain-crossover-overclaim` / `title-vs-requirements` / `recency-discount` (FR-005) |
 | `applicationState` | one of the 8 values | Mirrors the Job Record's field at scoring time (FR-007) |
 | `namedOutcome` | string \| null | Set when this evaluation carries a flag from the fixed vocabulary (e.g. `open.unresolved` on an unresolvable record) rather than being a clean result |
@@ -118,13 +118,23 @@ apply to records that never reach this feature (e.g. a `configError` tracked sou
 | `reviewStatus` | `"pending"` \| `"accepted"` \| `"corrected"` \| `"rejected"` | FR-011 |
 | `note` | string \| null | Citation/uncertainty note when relevant |
 
+A `DelegationLogEntry` is embedded in `FitEvaluation.delegations[]` when the Job Record it belongs to
+has one. A `still_open_scan` entry for a record that ends up `confirmed-closed` has no `FitEvaluation`
+to embed it in (FR-002a: closed records are never scored) — that entry is instead appended directly
+as a `provenance-log.md` line (see ProvenanceLogEntry below), so FR-011's "every delegated sub-task
+MUST be recorded" holds even when no Fit Evaluation file exists for the record.
+
 ---
 
 ## ProvenanceLogEntry  *(output — append-only, extends feature 001's shared log)*
 
 Same shape as feature 001's (`at`, `run`, `what`, `how`, `why`); this feature appends one line per
 open-status mark **set or changed** (not per re-check that reproduces the existing mark, FR-009),
-per Fit Evaluation written, and per `applicationState` value recorded (FR-015).
+per Fit Evaluation written, per `applicationState` value recorded (FR-015), and per `still_open_scan`
+delegation call made against a record that does not (or does not yet) have a `FitEvaluation` file —
+`what: "still_open_scan delegation"`, `why` naming the raw signal and `reviewStatus` (FR-010/FR-011).
+A `still_open_scan` call for a record that *does* get scored this run is logged once, in that Fit
+Evaluation's `delegations[]` (T023 mirrors it there) — never duplicated as a second provenance line.
 
 ---
 

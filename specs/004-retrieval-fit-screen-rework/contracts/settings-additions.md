@@ -15,7 +15,7 @@ All three follow the same `{ status, value }` shape feature 001/002 already use.
 {
   "status": "answered",
   "value": {
-    "files": ["evidence/career-history.md", "evidence/cv-content.md"]
+    "files": ["inputs/evidence/career-history.md", "inputs/evidence/cv-content.md"]
   }
 }
 ```

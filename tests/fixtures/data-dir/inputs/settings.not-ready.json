@@ -16,7 +16,10 @@
     "directions": { "status": "unset", "value": [] },
     "trackedBoards": { "status": "unset", "value": [] },
     "collectionTuning": { "status": "skipped", "value": { "pacingMs": 3000, "fetchCap": 300, "defaultDepth": 25 } },
-    "scoringWeightNotes": { "status": "skipped", "value": { "text": "" } }
+    "scoringWeightNotes": { "status": "skipped", "value": { "text": "" } },
+    "evidenceBase": { "status": "unset", "value": { "files": [] } },
+    "hardConstraints": { "status": "unset", "value": { "compFloor": null, "excludedRoleNatures": [] } },
+    "targetRoles": { "status": "unset", "value": { "streams": [], "recencyWindowYears": null } }
   },
   "completeness": {
     "setupReady": false,

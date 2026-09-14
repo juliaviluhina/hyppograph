@@ -3,26 +3,50 @@
   "sections": {
     "candidateBasics": {
       "status": "answered",
-      "value": { "displayName": "Test Candidate", "contactLine": null },
+      "value": {
+        "displayName": "Test Candidate",
+        "contactLine": null
+      },
       "profileFileExists": false
     },
     "locations": {
       "status": "answered",
-      "value": { "preferred": ["Remote (EU)", "Berlin"], "excluded": ["Onsite USA"] }
+      "value": {
+        "preferred": [
+          "Remote (EU)",
+          "Berlin"
+        ],
+        "excluded": [
+          "Onsite USA"
+        ]
+      }
     },
     "workArrangement": {
       "status": "answered",
-      "value": { "preference": "remote-or-hybrid", "onSiteTolerance": null }
+      "value": {
+        "preference": "remote-or-hybrid",
+        "onSiteTolerance": null
+      }
     },
     "compensation": {
       "status": "skipped",
-      "value": { "floor": 0, "target": null, "currency": "EUR", "benchmarkNotes": null }
+      "value": {
+        "floor": 0,
+        "target": null,
+        "currency": "EUR",
+        "benchmarkNotes": null
+      }
     },
     "hardStops": {
       "status": "answered",
       "value": {
-        "excludedLocations": ["United States (on-site)", "India"],
-        "lackedClearances": ["US Security Clearance (TS/SCI)"],
+        "excludedLocations": [
+          "United States (on-site)",
+          "India"
+        ],
+        "lackedClearances": [
+          "US Security Clearance (TS/SCI)"
+        ],
         "lackedWorkAuth": [],
         "visaSponsorshipRequired": true
       }
@@ -64,36 +88,60 @@
     },
     "collectionTuning": {
       "status": "answered",
-      "value": { "pacingMs": 3000, "fetchCap": 300, "defaultDepth": 25 }
+      "value": {
+        "pacingMs": 3000,
+        "fetchCap": 300,
+        "defaultDepth": 25
+      }
     },
     "scoringWeightNotes": {
       "status": "skipped",
-      "value": { "text": "" }
+      "value": {
+        "text": ""
+      }
     },
     "evidenceBase": {
       "status": "answered",
-      "value": { "files": ["inputs/evidence/career-history.md", "inputs/evidence/cv-content.md"] }
+      "value": {
+        "files": [
+          "inputs/evidence/career-history.md",
+          "inputs/evidence/cv-content.md"
+        ]
+      }
     },
     "hardConstraints": {
       "status": "answered",
       "value": {
-        "compFloor": { "amount": 90000, "currency": "EUR" },
-        "excludedRoleNatures": ["on-call rotation"]
+        "compFloor": {
+          "amount": 90000,
+          "currency": "EUR"
+        },
+        "excludedRoleNatures": [
+          "on-call rotation"
+        ]
       }
     },
     "targetRoles": {
       "status": "answered",
       "value": {
         "streams": [
-          { "name": "AI Engineering", "seniorityCeiling": "staff", "description": "Applied AI / LLM engineering roles: building products on top of foundation models, RAG pipelines, agent frameworks, prompt/eval infrastructure, inference serving." },
-          { "name": "Test Automation", "seniorityCeiling": "principal", "description": "Senior SDET / test automation architect roles: end-to-end and API test frameworks, CI test infrastructure, quality strategy for engineering orgs." }
-        ],
-        "recencyWindowYears": 4
+          {
+            "name": "AI Engineering",
+            "seniorityCeiling": "staff",
+            "description": "Applied AI / LLM engineering roles: building products on top of foundation models, RAG pipelines, agent frameworks, prompt/eval infrastructure, inference serving."
+          },
+          {
+            "name": "Test Automation",
+            "seniorityCeiling": "principal",
+            "description": "Senior SDET / test automation architect roles: end-to-end and API test frameworks, CI test infrastructure, quality strategy for engineering orgs."
+          }
+        ]
       }
     }
   },
   "completeness": {
     "setupReady": true,
     "unresolved": []
-  }
+  },
+  "$comment": "Fixture for spec 004 quickstart scenario 10 / SC-012 / T002: targetRoles.recencyWindowYears deliberately missing. Expect: fit-screen.js reports config.evidence-unavailable naming the missing field and makes zero writes."
 }

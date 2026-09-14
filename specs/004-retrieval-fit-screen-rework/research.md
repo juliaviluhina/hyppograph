@@ -71,11 +71,11 @@ which is the exact conflation FR-007 was written to prevent.
 ### R4 — Where does the evidence base live, and how is it named in settings?
 
 **Decision**: `inputs/evidence/` (new directory, sibling to `inputs/manual-postings/`).
-`evidenceBase.value = { files: ["evidence/career-history.md", "evidence/cv-content.md", ...] }` —
+`evidenceBase.value = { files: ["inputs/evidence/career-history.md", "inputs/evidence/cv-content.md", ...] }` —
 paths relative to `HYPPO_DATA_DIR`, opaque list, at least one entry required (empty list ⇒
 `config.evidence-unavailable`, per spec FR-000/Edge Cases).
 
-**Rationale**: Mirrors the reference's `evidence/career-history.md` + `evidence/cv-content.md`
+**Rationale**: Mirrors the reference's `inputs/evidence/career-history.md` + `inputs/evidence/cv-content.md`
 convention closely enough that the fabricated-persona settings template (FR-000a) can point at
 directly analogous file names, while staying a flat, opaque list so the user can add/rename files
 without a schema change.
@@ -154,3 +154,60 @@ repo's own pipeline, so a clean field replacement on next-touch is safe.
 
 **Rationale**: Avoids two competing "have I applied" fields on the same file, which is precisely the
 kind of confusion FR-007 exists to eliminate.
+
+---
+
+### R10 — Concrete alias for the `mid` tier (`hyppo-score`)
+
+**Decision**: `hyppo-score` is declared `model: "sonnet"` in `.claude/agents/hyppo-score.md` and in
+the `agent()` call's options — the same `mid` → `sonnet` mapping feature 001's own research.md (R2)
+already reserved for this feature ("`mid` → `sonnet` — reserved for downstream scoring, not used
+here"). Phase A (this script) has no `config/index.ts` to centralize the map yet, so the alias is a
+literal at the one call site that uses it; Phase B's `model/judge.ts` tier map (plan.md) is where a
+`HYPPO_MODEL_MID` env override, mirroring feature 001's `HYPPO_MODEL_FAST`, would be added.
+
+**Rationale**: Resolves the `<mid-tier alias>` placeholder left in planning without inventing a new
+tier-to-model convention — feature 001 already named `sonnet` as the reserved mid-tier alias before
+this feature existed.
+
+---
+
+### R11 — Deciding "more likely than not to fail" for an `unresolved` hard constraint (FR-004a)
+
+**Decision**: `hyppo-score` reports, for every hard constraint it marks `unresolved`, a companion
+`likelyOutcome` field ∈ `likely-pass` / `likely-fail` / `even` — its own best-effort read of the
+posting text and evidence base (e.g. a salary range with no floor stated but a title/level pattern
+matching roles the user has seen fail `compFloor` before; a location field blank but the posting's
+company known to be single-office in a disallowed city). The script (not the model) then applies the
+fixed rule: `unresolved` + `likelyOutcome: "likely-fail"` ⇒ overall verdict `SKIP`; `unresolved` +
+`likely-pass`/`even` ⇒ overall verdict capped at `APPLY-AND-SEE` with the blocker surfaced. This
+keeps the *rule* in code (Principle I) while giving the model a bounded, explicit field to express
+the judgment FR-004a's prose otherwise left implicit.
+
+**Rationale**: FR-004a's "more likely than not to fail" has to be decided by *something* — leaving it
+as unstructured prose in the verdict-computation task (T021) meant the actual criterion existed only
+in a task author's head. Naming it as a discrete, schema-visible field makes it citable, testable
+(SC-004-style labelled cases can assert on `likelyOutcome` directly), and auditable the same way every
+other verdict field already is (FR-012's "never only a bare score").
+
+**Alternatives considered**: Defaulting every `unresolved` constraint to `APPLY-AND-SEE` (never
+`SKIP`) — rejected, contradicts FR-004a's explicit two-branch rule and would silently soften genuine
+likely-fails (e.g. a clearly out-of-budget range with only the exact floor unstated) into a false
+`APPLY-AND-SEE`.
+
+---
+
+### R12 — Code owns config parsing; agents return raw bytes (runs 4–6 lesson, 2026-09-14)
+
+**Decision**: No agent in this feature transcribes structured config. The settings reader returns
+the raw file text (`rawFileReadSchema`: `found` + `content`) and the script does `JSON.parse()` +
+field extraction in plain code; evidence reads are one file per call, echoed verbatim. This
+generalizes the run-6 fix: three consecutive runs corrupted the same `evidenceBase.files` field in
+three different ways (missing `inputs/` prefix, doubled absolute-path prefix, settings.json path
+echoed as evidence) while larger structures came through correctly — prompt hardening (run 4's
+attempt 1) did not hold. Principle I ("plain code owns all control flow") extends here to "plain
+code owns config parsing": never trust a model to transcribe JSON the script can parse itself.
+
+**Rationale**: Field-level transcription errors are silent (the flow looks healthy, every verdict is
+just `Unknown`) and only surface via a full end-to-end run. Raw passthrough + code-side parse makes
+the failure class structurally impossible instead of prompt-unlikely.
