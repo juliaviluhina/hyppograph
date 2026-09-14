@@ -6,17 +6,20 @@ Zero-live-dependency tests for feature 004's verify-then-score flow
 ## What runs fully automatically
 
 ```bash
-npm run harness            # full node suite, exit 0 iff green (one expected-red, see below)
+npm run harness            # full node suite, exit 0 iff green (see below)
 npm run harness -- --case=verify-signal   # single case (debug)
 npm test                   # unaffected (004-era eval scaffold)
 ```
 
-54 cases, all green except `idempotency-unchanged-rerun`, which is **red by design**
-(004 T024 unimplemented; fix owns to 006 — see `specs/006-fit-screen-gap-fixes/`).
+57 cases, all green (006 closed the sole `idempotency-unchanged-rerun` red — see
+`specs/006-fit-screen-gap-fixes/`). A session `--assert` run additionally reports the three
+ATS-backed matrix cases as `blocked` unless run with `--wire live`
+(`contracts/harness-report-amendment.md` — transport gap, not a failure).
 Covered: fixture-service behavior, URL construction + override seam, signal/mark/verdict
 logic (mirrored + sync-checked against the workflow), fixture honesty, config gate,
 citation resolution, structural pins for every 004 run-5/6/7 fix, agent grants, wiring,
-and the full assertion layer against synthetic session shapes.
+the idempotency fingerprint guard, and the full assertion layer against synthetic session
+shapes.
 
 ## Layout
 

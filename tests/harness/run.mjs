@@ -4,8 +4,11 @@
 //   --serve         foreground fixture service (for session-backed workflow runs)
 //   --prep          create scratch dir + print the session instruction block (args JSON)
 //   --assert        check a session-run scratch dir against support/expectations.mjs
-// Report rule (contracts/harness-report.md): exit 0 iff every case passes, except the
-// single hardcoded EXPECTED_RED_CASE which may report expected-red.
+// Report rule (contracts/harness-report.md, amended by 006 contracts/harness-report-amendment.md):
+// exit 0 iff every case passes (zero unexpected-red); `blocked` cases (transport-unreachable,
+// requiresWire) count in neither pass nor fail. 006 T009 retired the prior hardcoded
+// EXPECTED_RED_CASE passthrough (idempotency-unchanged-rerun) — that case is now ordinary
+// pass/unexpected-red like every other.
 import { spawn, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
@@ -14,7 +17,7 @@ import { fileURLToPath } from "node:url";
 import { harnessPort, assertPortFree } from "./support/ports.mjs";
 import { makeScratch } from "./support/scratch.mjs";
 import { assertLoopbackOnly } from "./support/isolation.mjs";
-import { EXPECTED_RED_CASE, overrideMap } from "./support/expectations.mjs";
+import { overrideMap } from "./support/expectations.mjs";
 import { assertScratch } from "./support/assert.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -23,21 +26,32 @@ const SCENARIOS = path.join(HERE, "scenarios.json");
 const REPORT = path.join(HERE, "last-report.md");
 
 function usage() {
-  console.log(`usage: run.mjs [test] [--case=name] | --serve [--port N] | --prep | --assert --dir <scratch> --access-log <file> [--service-origin <origin>]`);
+  console.log(`usage: run.mjs [test] [--case=name] | --serve [--port N] | --prep | --assert --dir <scratch> --access-log <file> [--service-origin <origin>] [--wire live|isolated]`);
   process.exit(2);
 }
 
 // ---- report ----
+// 006 contracts/harness-report-amendment.md — `blocked` is listed separately, counted in
+// neither pass nor fail; exit code stays driven only by `unexpected-red`.
 function writeReport(cases, isolationProof) {
   const unexpected = cases.filter((c) => c.verdict === "unexpected-red");
+  const blockedCases = cases.filter((c) => c.verdict === "blocked");
+  const otherCases = cases.filter((c) => c.verdict !== "blocked");
+  const expectedRed = cases.filter((c) => c.verdict === "expected-red");
+  const passCount = cases.filter((c) => c.verdict === "pass").length;
   const lines = [
     `# Harness report`,
     ``,
     `at: ${new Date().toISOString()}`,
     ``,
-    ...cases.map(
+    ...otherCases.map(
       (c) => `- ${c.verdict === "pass" ? "[x]" : "[ ]"} ${c.name}${c.tracesTo ? ` (traces to ${c.tracesTo})` : ""} — ${c.verdict}${c.note ? `: ${c.note}` : ""}`
     ),
+    ...(blockedCases.length > 0
+      ? [``, `## Blocked (transport-unreachable, counted in neither pass nor fail)`, ``, ...blockedCases.map((c) => `- [~] ${c.name} — blocked${c.note ? `: ${c.note}` : ""}`)]
+      : []),
+    ``,
+    `counts: pass ${passCount} · blocked ${blockedCases.length} · expected-red ${expectedRed.length} · unexpected-red ${unexpected.length}`,
     ``,
     `isolation: atsCallsInServiceLog=${isolationProof.atsCallsInServiceLog}, nonLoopbackTargetsObserved=${isolationProof.nonLoopbackTargetsObserved}`,
     ``,
@@ -138,8 +152,11 @@ if (argv.includes("--serve")) {
   const alog = argv[argv.indexOf("--access-log") + 1];
   const soi = argv.indexOf("--service-origin");
   const origin = soi >= 0 ? argv[soi + 1] : null;
+  const wi = argv.indexOf("--wire");
+  const wire = wi >= 0 ? argv[wi + 1] : "isolated"; // 006 R3 — default isolated; "live" asserts requiresWire cases for real
   if (!dir || !alog) usage();
-  const { cases, isolationProof } = await assertScratch(dir, alog, undefined, origin);
+  if (wire !== "live" && wire !== "isolated") usage();
+  const { cases, isolationProof } = await assertScratch(dir, alog, undefined, origin, wire);
   process.exit(writeReport(cases, isolationProof));
 } else {
   // default: node test suite with managed service (T008 checkpoint: "no cases" is RED)
@@ -158,13 +175,6 @@ if (argv.includes("--serve")) {
     process.exit(writeReport([{ name: "isolation:origin", verdict: "unexpected-red", note: e.message }], { atsCallsInServiceLog: 0, nonLoopbackTargetsObserved: 1 }));
   }
   const { cases } = runNodeTests(filter);
-  // expected-red passthrough: exactly one case ID may claim it (006 owns the fix).
-  for (const c of cases) {
-    if (c.name.includes(EXPECTED_RED_CASE) && c.verdict === "unexpected-red") {
-      c.verdict = "expected-red";
-      c.note = "T024 → 006";
-    }
-  }
   await stopService(child);
   process.exit(writeReport(cases, { atsCallsInServiceLog: "see service self-test", nonLoopbackTargetsObserved: 0 }));
 }

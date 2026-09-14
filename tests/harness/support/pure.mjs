@@ -47,6 +47,39 @@ export function isInsufficientInput(rec) {
   return missing(rec.roleTitle) || missing(rec.canonicalCompany) || noRequirements;
 }
 
+// 006 T003/T007 — FNV-1a 32-bit over UTF-16 code units, hex, zero-padded to 8 chars.
+// contracts/eval-fingerprint.md — mirrored verbatim from .claude/workflows/fit-screen.js.
+export function fnv1aHex(str) {
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < str.length; i++) {
+    hash ^= str.charCodeAt(i);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return (hash >>> 0).toString(16).padStart(8, "0");
+}
+
+// 006 T003/T007 — contracts/eval-fingerprint.md. parts[0] is the parsed-record proxy (T002 decision),
+// not raw file text: identical shape to buildScorePrompt's JOB RECORD JSON, so anything that could
+// change hyppo-score's answer is already covered.
+export function computeInputFingerprint({ rec, evidenceFiles, applications, hardConstraints, hardStops, targetRoles }) {
+  const parts = [
+    JSON.stringify({
+      roleTitle: rec.roleTitle,
+      canonicalCompany: rec.canonicalCompany,
+      locations: rec.locations,
+      salaryAmountOrRange: rec.salaryAmountOrRange,
+      salaryCurrency: rec.salaryCurrency,
+      responsibilitiesSummary: rec.responsibilitiesSummary,
+      requirements: rec.requirements,
+      openStatus: rec.openStatus,
+    }),
+    ...evidenceFiles.map((f) => f.content),
+    applications.exists ? applications.content : "NO_TRACKER",
+    JSON.stringify({ hardConstraints, hardStops, targetRoles }),
+  ];
+  return fnv1aHex(parts.join("\n---\n"));
+}
+
 export function computeOverallVerdict(requirementTable, hardConstraints) {
   const RANK = { SKIP: 0, "APPLY-AND-SEE": 1, APPLY: 2 };
 

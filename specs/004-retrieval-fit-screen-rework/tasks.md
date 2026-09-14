@@ -198,7 +198,11 @@ an overall verdict consistent with the table.
       REOPENED 2026-09-14: marked done from code review during run 9, but the score phase still
       re-scores unconditionally — not implemented. Pinned as red-by-design test in 005, fix owns to 006.
 - [ ] T025 [US1] Manual validation: run the `score` phase over the fixture Job Records (T004);
-      verify quickstart scenarios 1–4 by hand
+      verify quickstart scenarios 1–4 by hand. **Superseded by 005 cases** (006 T020, 2026-09-14):
+      `score-cited-rows.*`, `citation-advisory.*`, `evidence-single-read.*`
+      (`tests/harness/worker-cases/`) — cited requirement rows, citation-audit rejection handling,
+      and per-file evidence reads are all asserted structurally without a manual run. A live-session
+      run is still the only way to eyeball actual hyppo-score prose quality (not a harness concern).
 
 **Checkpoint**: Scoring works standalone against every kept Job Record — MVP delivers cited,
 decision-ready evaluations
@@ -247,7 +251,13 @@ unverified" flag visible.
       provenance line only for a newly-set or changed mark (FR-015)
 - [ ] T033 [US2] Manual validation: run `verify`+`score` over the fixture and live (T006) Job
       Records; verify quickstart scenarios 5 and 6 by hand — including a second run where the mocked/
-      live ATS response changes, confirming the mark updates without disturbing the prior evaluation
+      live ATS response changes, confirming the mark updates without disturbing the prior evaluation.
+      **Superseded by 005 cases** (006 T020, 2026-09-14): `flapping: post-flip scratch passes
+      flipped expectations, fails default ones` and `verify-signal: self-configure scenarios, then
+      assert ground truth` / `mapping + non-ATS short-circuit` (`tests/harness/regression-cases/`,
+      `tests/harness/worker-cases/`) cover the mark-flip-without-disturbing-evaluation assertion
+      structurally. The genuinely **live** ATS call (real `https://` posting) still needs a human
+      session per `intake.md` F1 / 005 research.md R8 — the isolated harness cannot reach it.
 
 **Checkpoint**: Only genuinely open (or unverifiable) roles get scored; closed roles are excluded and
 reported — all four user stories now compose into one coherent run
@@ -277,7 +287,11 @@ resolves to the correct distinct `ApplicationStateValue`.
 - [X] T037 [US3] Mirror `applicationState` onto the FitEvaluation front matter at scoring time
       (`contracts/evaluation-format.md`)
 - [ ] T038 [US3] Manual validation: run over the `applications.md` fixture rows (T005); verify
-      quickstart scenario 7 by hand, including the no-tracker-file case defaulting to `unknown`
+      quickstart scenario 7 by hand, including the no-tracker-file case defaulting to `unknown`.
+      **Superseded by 005 cases** (006 T020, 2026-09-14): `applications-presence: tracker parses
+      with a submitted match row` and `applications-presence: missing file forces unknown in code,
+      not in the model` (`tests/harness/worker-cases/applications-presence.test.mjs`) assert exactly
+      this, structurally, on every run.
 
 **Checkpoint**: Every evaluation carries a real, reconciled application status
 
@@ -308,7 +322,11 @@ log use exactly the vocabulary name in every case.
 - [ ] T044 [US4] Manual validation: force each of the four outcomes against fixtures (delete an
       evidence file, truncate a Job Record's requirements, remove `recencyWindowYears`, engineer a
       conflicting tracker match); verify quickstart scenario 8 by hand — grep the run summary and
-      `provenance-log.md` for any outcome text outside `data-model.md`'s `NamedOutcome` enumeration
+      `provenance-log.md` for any outcome text outside `data-model.md`'s `NamedOutcome` enumeration.
+      **NOT superseded** (006 T020, 2026-09-14): no 005 harness case forces or asserts the
+      named-outcome vocabulary end-to-end (checked — zero hits for `namedOutcome`/`NamedOutcome`
+      under `tests/harness/`). This still needs a human session run; candidate for a future 005/006
+      follow-up case, out of scope here per FR-004 (no fix without a failing case).
 
 **Checkpoint**: All four stories functional end-to-end as one workflow run
 

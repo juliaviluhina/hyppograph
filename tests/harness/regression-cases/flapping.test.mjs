@@ -12,6 +12,9 @@ import { makeScratch } from "../support/scratch.mjs";
 import { assertScratch } from "../support/assert.mjs";
 import { SIGNAL_EXPECTATIONS } from "../support/expectations.mjs";
 
+// 006 R3 — wire="live" below: this scratch fabricates on-disk state directly (no real wire
+// call), so it exercises the real matrix logic on umbrella (requiresWire) rather than the
+// isolated-run `blocked` short-circuit; see blocked-mode.test.mjs for that behavior.
 const FLIPPED = {
   ...SIGNAL_EXPECTATIONS,
   "umbrella--backend-engineer--remote-eu": { mark: "confirmed-closed", evaluated: true },
@@ -63,9 +66,9 @@ function postFlipScratch() {
 test("flapping: post-flip scratch passes flipped expectations, fails default ones", async () => {
   const s = postFlipScratch();
   try {
-    const flipped = await assertScratch(s.dir, s.alog, FLIPPED);
+    const flipped = await assertScratch(s.dir, s.alog, FLIPPED, null, "live");
     assert.deepEqual(flipped.cases.filter((c) => c.verdict !== "pass"), [], JSON.stringify(flipped.cases, null, 2));
-    const def = await assertScratch(s.dir, s.alog);
+    const def = await assertScratch(s.dir, s.alog, undefined, null, "live");
     assert.equal(
       def.cases.find((c) => c.name === "matrix:umbrella--backend-engineer--remote-eu")?.verdict,
       "unexpected-red"

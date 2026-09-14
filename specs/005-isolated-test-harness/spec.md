@@ -137,3 +137,10 @@ Each real issue surfaced by 004's nine manual runs is pinned as a labelled fixtu
 - Constitution Principle V holds: all fixture content is fabricated; no real personal data enters the repo through this harness.
 - The idempotency case stays red-by-design until 006 implements the FR-009/T024 skip-when-unchanged logic; 005 never marks it passing to look green.
 - Port selection, service lifecycle (start/stop), and base-URL configuration are harness details resolved at plan time, not in this spec.
+- Transport constraint (research.md R8): WebFetch upgrades `http://` to `https://`
+  unconditionally, so `hyppo-verify` cannot reach the plain-HTTP fixture service —
+  isolated session runs show ATS-backed records as `unresolvable` by design, not as a
+  regression. The worker's wire behavior is proven separately against a real `https://`
+  ATS endpoint via `tests/fixtures/live/`; the loopback service pins everything else.
+  SC-002's "100% pass" reads subject to this: wire-blocked expectations report
+  `blocked` (006), never forced green.

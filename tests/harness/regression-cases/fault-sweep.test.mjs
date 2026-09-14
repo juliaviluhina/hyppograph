@@ -10,7 +10,7 @@
 //   run 6 (transcribed settings) .... hasRawSettingsPassthrough below
 //   run 7 (blocking audit) .......... hasNonBlockingAudit below
 //   run 8 (green baseline) .......... full-flow.test.mjs good-shape case
-//   run 9 + T024 (no idempotency) ... idempotency.test.mjs (expected-red → 006)
+//   run 9 + T024 (no idempotency) ... idempotency.test.mjs (fixed by 006 T004)
 import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";

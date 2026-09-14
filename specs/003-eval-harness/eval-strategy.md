@@ -271,6 +271,17 @@ Controls instead:
    or all three before any more workflow runs?
 7. **Report location** — `docs/eval-reports/` (recommended — evidence, not spec), or under
    `specs/001-intake-normalize-pipeline/eval-runs/` to keep it beside this doc? See §9.
+8. **Broader metric coverage (2026-09-14, from 006 discussion)** — today's judge (`judge.mjs`,
+   `contracts/judge-rubric.md`) covers exactly two rubric types (`extraction-faithfulness`,
+   `pre-triage-reason`), deliberately narrow per FR-010. Candidate future work: extend the Tier
+   2/3 pyramid with a wider metric set — hallucination/faithfulness scoring on `hyppo-score`'s
+   requirement-table citations (004), contextual relevancy/precision for the fit-screen retrieval
+   step, G-Eval-style custom-criteria grading — evaluated framework-agnostic (a Python DeepEval
+   sidecar was one option raised, but clashes with the Node-only/zero-runtime-dep constraint in
+   §6/plan.md; a hand-rolled metric in `judge.mjs`'s existing pattern is the more likely fit).
+   Purpose: demonstrate a genuinely layered eval design (deterministic + rubric + broader metrics),
+   not just close a specific bug — closer to a portfolio goal than a 006-scoped fix, so it does
+   NOT enter 006 (FR-004 bars new behavior there). Needs its own spec if picked up.
 
 ## 8. Relationship to existing tasks
 
