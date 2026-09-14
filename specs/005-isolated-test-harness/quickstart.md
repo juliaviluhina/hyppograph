@@ -66,3 +66,6 @@ in-session halves pending (S).
 Copy nothing by hand: the runner builds the scratch dir from the committed
 `tests/fixtures/data-dir/` every run. The only local state is the port (must be free) and the
 `ATS_API_BASE_OVERRIDES` map the runner generates pointing at the started service.
+
+Operator howto (layout, commands, session rails, troubleshooting):
+[`tests/harness/README.md`](../../tests/harness/README.md).

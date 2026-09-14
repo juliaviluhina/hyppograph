@@ -90,6 +90,20 @@ Pipeline steps are prototyped as [Claude Code dynamic
 workflows](https://code.claude.com/docs/en/workflows) — cheap to iterate in a
 session — and ported to the Claude Agent SDK once proven.
 
+## Testing the pipeline
+
+The verify-then-score flow has an isolated harness — no live ATS calls, no real
+postings, stdlib only:
+
+```bash
+npm run harness   # 54 green + 1 expected-red (documented), exit 0 iff green
+```
+
+Howto, layout, and the session-backed rails (the workflow itself runs in a Claude
+session; the harness checks it): [`tests/harness/README.md`](tests/harness/README.md).
+Design: [`specs/005-isolated-test-harness/`](specs/005-isolated-test-harness/);
+known gaps queued with evidence in [`specs/006-fit-screen-gap-fixes/intake.md`](specs/006-fit-screen-gap-fixes/intake.md).
+
 ## License
 
 [Apache-2.0](LICENSE) — free for any use including commercial; keep `LICENSE`
