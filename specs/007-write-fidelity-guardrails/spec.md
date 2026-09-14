@@ -13,6 +13,14 @@ F4 in particular — `write-evaluation` non-deterministically dropping its own f
 spec asks: can this class of bug be caught by cheaper, more atomic tests, before it needs a full
 ~90-agent live session run to surface?"
 
+## Clarifications
+
+### Session 2026-09-14
+
+- Q: Where should the new atomic (Tier-2, real-model-call) write-fidelity tests live, and how should a developer run them? → A: New folder (e.g. `tests/fidelity/`, following existing `tests/harness/` naming) with its own `npm run test:fidelity` script, separate from `npm run harness`.
+- Q: Should US3's convention-note document be a required deliverable with its own FR, or is the structural pin (FR-004) alone sufficient to close US3? → A: Require both — a new FR mandates the convention doc (e.g. `contracts/verbatim-write.md`), referenced from both scripts' module header comments, alongside FR-004's structural pin.
+- Q: What should FR-004's structural pin check to confirm a call site uses the BEGIN-CONTENT/END-CONTENT marker convention? → A: Literal string check — grep/regex the prompt-builder function's source text for both literal markers, same style as the existing `hasRawSettingsPassthrough` pin (static, no execution).
+
 ## Background — the finding this spec is built on
 
 006 T016/T017 (2026-09-14) ran `.claude/workflows/fit-screen.js` live three times via the Workflow
@@ -172,10 +180,17 @@ regression at the free, node-only tier even before US1's atomic test would.
   existing pin convention, e.g. `hasRawSettingsPassthrough`) MUST check that all three at-risk call
   sites (#1/#2/#3) use the marker convention, so a future regression there — or a new verbatim-write
   prompt added without markers — is caught before a live session is needed. Out-of-class sites
-  #4-#8 get no pin (nothing to check).
+  #4-#8 get no pin (nothing to check). The check is a literal string match against the
+  prompt-builder function's source text for both `BEGIN-CONTENT` and `END-CONTENT` markers — a
+  static source-text check, not an AST parse or runtime execution, matching the existing pins'
+  style and cost.
 - **FR-005**: This spec MUST NOT change any scoring, verdict, verification, or persistence
   semantics — it is testing and prompt-formatting hardening only, matching 006's "no new pipeline
   behavior" discipline for anything touching production code paths.
+- **FR-006**: A short, linkable convention note (e.g. `contracts/verbatim-write.md`) MUST exist
+  documenting the BEGIN-CONTENT/END-CONTENT marker convention, and MUST be referenced from both
+  `fit-screen.js`'s and `intake-normalize.js`'s module header comments — the human-readable half of
+  US3, alongside FR-004's structural pin.
 
 ### Key Entities
 
@@ -205,7 +220,9 @@ regression at the free, node-only tier even before US1's atomic test would.
 - The atomic tests from US1 need real (if inexpensive) model calls — they are NOT part of the
   existing zero-live-dependency `npm run harness` node suite, matching 003-eval-harness's own
   Tier 1 (free) vs Tier 2 (cheap, real calls) split; this spec's new tier sits alongside, not inside,
-  005's existing harness.
+  005's existing harness. Concretely: a new folder (e.g. `tests/fidelity/`, mirroring
+  `tests/harness/` naming) with its own `npm run test:fidelity` script, invoked separately from
+  `npm run harness`.
 - No new pipeline behavior — this is purely testing/prompt-formatting hardening on already-shipped
   006 behavior (Assumption carried from 006's own discipline).
 - `intake-normalize.js`'s call sites are in scope for the audit (FR-002) even though its own fixes,
