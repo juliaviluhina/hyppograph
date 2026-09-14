@@ -1,0 +1,37 @@
+// 005 — machine-readable form of contracts/expected-matrix.md (concrete fixtures).
+// The --assert mode checks a scratch dir against this; the contract stays the source
+// of truth for humans. Keep the two in sync when fixtures change.
+export const EXPECTED_RED_CASE = "idempotency-unchanged-rerun";
+
+export const OVERRIDE_HOSTS = [
+  "boards-api.greenhouse.io",
+  "api.lever.co",
+  "api.ashbyhq.com",
+];
+
+export function overrideMap(origin) {
+  return Object.fromEntries(OVERRIDE_HOSTS.map((h) => [h, origin]));
+}
+
+// key -> expectation for a session-backed workflow run with default scenarios
+// (tests/harness/scenarios.json) against a scratch copy of the fixtures.
+export const SIGNAL_EXPECTATIONS = {
+  "acme--backend-engineer--remote-eu": {
+    mark: "confirmed-open",
+    evaluated: true,
+    verdict: "APPLY",
+  },
+  "initech--backend-engineer--remote-eu": {
+    mark: "confirmed-closed",
+    evaluated: false,
+  },
+  "umbrella--backend-engineer--remote-eu": {
+    // flapping starts live: first run scores it; the flip case (T021) asserts the rest
+    mark: "confirmed-open",
+    evaluated: true,
+  },
+  "hooli--closed-role--remote-eu": {
+    mark: "confirmed-closed", // terminal: never re-checked, never scored
+    evaluated: false,
+  },
+};

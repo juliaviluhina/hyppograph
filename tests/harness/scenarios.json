@@ -1,0 +1,6 @@
+{
+  "/v1/boards/acme-fixture/jobs/101": "live",
+  "/v0/postings/initech-fixture/abc123": "closed",
+  "/posting-api/job-board/umbrella-fixture/def456": "flapping",
+  "/v1/boards/hyppograph-fixture-nonexistent-org/jobs/999999999": "closed"
+}

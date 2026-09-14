@@ -25,6 +25,22 @@ every row names its expected terminal state. (Fixture files themselves live unde
 | Non-ATS source | n/a (no call) | `unresolvable` | Scored with flag; no service access-log entry |
 | Flapping live→closed | `flapping`, flipped between runs | Mark updates; prior evaluation untouched | `score` skips the now-terminal record |
 
+### Concrete harness fixtures (005 T009)
+
+Fabricated orgs; ATS-shaped sourceRefs stay production-faithful and route to the fixture
+service only via the `ATS_API_BASE_OVERRIDES` map. Under a manual live run (no map) they
+classify closed — correct for fabricated orgs, and never a harness path.
+
+| Key | Board shape | Posting path (service) | Default scenario | Expected outcome |
+|---|---|---|---|---|
+| `acme--backend-engineer--remote-eu` | Greenhouse | `/v1/boards/acme-fixture/jobs/101` | `live` | `confirmed-open`, evaluated, `APPLY` |
+| `initech--backend-engineer--remote-eu` | Lever | `/v0/postings/initech-fixture/abc123` | `closed` | `confirmed-closed`, no evaluation file |
+| `umbrella--backend-engineer--remote-eu` | Ashby | `/posting-api/job-board/umbrella-fixture/def456` | `flapping` (starts live) | run 1 scored; post-flip `confirmed-closed`, evaluation untouched |
+| `hooli--closed-role--remote-eu` | Greenhouse | `/v1/boards/hyppograph-fixture-nonexistent-org/jobs/999999999` | `closed` | terminal `confirmed-closed`, never re-checked, never scored |
+
+Default scenario map lives in `tests/harness/scenarios.json` and is loaded by the service at
+startup and by the runner for assertions.
+
 ## Application-state fixtures
 
 No tracker match + tracker present → `not_applied` · `submitted` match → `submitted` ·

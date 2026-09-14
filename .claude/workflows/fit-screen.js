@@ -20,7 +20,11 @@
  *       args.runTimestamp : string  — ISO-8601, the frozen run clock + run id source
  *       args.dataDir      : string  — absolute path to HYPPO_DATA_DIR (inputs/ + outputs/ live here)
  *       args.pacingMs?    : number  — default 3000 (HYPPO_PACING_MS) — reused from feature 001 (FR-002d)
- *       args.fetchCap?    : number  — default 300  (HYPPO_FETCH_CAP) — reused from feature 001 (FR-002d)
+  *       args.fetchCap?    : number  — default 300  (HYPPO_FETCH_CAP) — reused from feature 001 (FR-002d)
+  *       args.atsApiBaseOverrides? : object — default {} — 005 harness routing: production-API-host
+  *           → loopback-origin map (e.g. {"boards-api.greenhouse.io":"127.0.0.1:8471"}). Empty/absent
+  *           ⇒ constructed URLs are byte-identical to production. Routing config only — no verdict,
+  *           mark, citation, or persistence path ever consults it.
  *
  * CONSTITUTION GUARDRAILS baked in here (see plan.md Constitution Check):
  *   I.  The workflow BODY sequences verify -> score. No agent() result may redirect control flow;
@@ -291,6 +295,11 @@ const RUN = args.runTimestamp;
 const DATA = args.dataDir;
 const PACING_MS = args.pacingMs ?? 3000; // FR-002d — reused from feature 001, not a second config
 const FETCH_CAP = args.fetchCap ?? 300;
+// 005 T007 — harness routing seam (research.md R2): host→origin overrides for the fixture
+// service. Empty by default ⇒ production URLs byte-identical. This is routing configuration
+// in the same category as PACING_MS/FETCH_CAP reuse — never consulted by any judgment,
+// verdict, mark, or persistence path.
+const ATS_API_BASE_OVERRIDES = args.atsApiBaseOverrides ?? {};
 
 log("fit-screen starting", { run: RUN, dataDir: DATA, pacingMs: PACING_MS, fetchCap: FETCH_CAP });
 
@@ -444,7 +453,7 @@ phase("verify");
       break;
     }
 
-    const atsUrl = buildAtsApiUrl(rec.sourceRefs); // research.md R5 — code decides, no agent call spent
+    const atsUrl = buildAtsApiUrl(rec.sourceRefs, ATS_API_BASE_OVERRIDES); // research.md R5 — code decides, no agent call spent
     let signal;
     let stillOpenScanEntry = null;
 
@@ -777,22 +786,38 @@ function validateFeatureConfig(settings) {
   return issues;
 }
 
+// 005 T007 — applies ATS_API_BASE_OVERRIDES to an already-constructed API URL.
+// Only exact https://<host> prefixes listed in the map are rewritten, to an
+// http://<origin> loopback target. Anything unmapped passes through untouched.
+function applyAtsBaseOverride(apiUrl, overrides) {
+  if (!overrides || typeof overrides !== "object") return apiUrl;
+  for (const [host, origin] of Object.entries(overrides)) {
+    const prefix = `https://${host}`;
+    if (typeof origin === "string" && origin !== "" && apiUrl.startsWith(prefix + "/")) {
+      return `http://${origin}` + apiUrl.slice(prefix.length);
+    }
+  }
+  return apiUrl;
+}
+
 // research.md R5 — the SCRIPT (not the subagent) recognizes Greenhouse/Lever/Ashby posting URLs and
 // builds the corresponding posting-API URL. Anything else returns null (mapped to unresolvable in
 // code with no agent call spent). sourceRefs is the Job Record's sources[].sourceRef list; the first
-// recognized URL wins.
-function buildAtsApiUrl(sourceRefs) {
+// recognized URL wins. `overrides` is the 005 harness routing map (empty in production).
+function buildAtsApiUrl(sourceRefs, overrides) {
+  let url = null;
   for (const ref of sourceRefs || []) {
     const gh = /^https?:\/\/(?:boards|job-boards)\.greenhouse\.io\/([^/]+)\/jobs\/(\d+)/.exec(ref);
-    if (gh) return `https://boards-api.greenhouse.io/v1/boards/${gh[1]}/jobs/${gh[2]}`;
+    if (gh) { url = `https://boards-api.greenhouse.io/v1/boards/${gh[1]}/jobs/${gh[2]}`; break; }
 
     const lever = /^https?:\/\/jobs\.lever\.co\/([^/]+)\/([^/?#]+)/.exec(ref);
-    if (lever) return `https://api.lever.co/v0/postings/${lever[1]}/${lever[2]}`;
+    if (lever) { url = `https://api.lever.co/v0/postings/${lever[1]}/${lever[2]}`; break; }
 
     const ashby = /^https?:\/\/jobs\.ashbyhq\.com\/([^/]+)\/([^/?#]+)/.exec(ref);
-    if (ashby) return `https://api.ashbyhq.com/posting-api/job-board/${ashby[1]}/${ashby[2]}`;
+    if (ashby) { url = `https://api.ashbyhq.com/posting-api/job-board/${ashby[1]}/${ashby[2]}`; break; }
   }
-  return null;
+  if (!url) return null;
+  return applyAtsBaseOverride(url, overrides);
 }
 
 // research.md R6 — the SCRIPT maps the raw signal to a mark; hyppo-verify never does this itself.
