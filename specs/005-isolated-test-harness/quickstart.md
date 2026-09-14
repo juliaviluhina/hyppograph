@@ -16,26 +16,45 @@ npm run harness            # service start → scratch copy → all cases → re
 npm run harness -- --case=verify-signal   # single case by name (debug use; CI runs all)
 ```
 
+Two layers (research.md R3/R7): the **node layer** above runs fully automatically (service
+behavior, pure-logic mirror + sync-check, support units, fixture honesty, structural pins,
+assertion-layer cases with synthetic scratches). The **session layer** runs the real
+`fit-screen.js` workflow in a Claude session against a `--prep` scratch dir, then checks it:
+
+```bash
+node tests/harness/run.mjs --prep                              # prints dataDir + atsApiBaseOverrides + service cmd
+node tests/harness/service.mjs --port 8471 --scenarios tests/harness/scenarios.json --access-log <scratch>/access.jsonl
+# ... run fit-screen.js in-session with the printed args ...
+node tests/harness/run.mjs --assert --dir <scratch> --access-log <scratch>/access.jsonl
+```
+
 Expected outcome: every case `pass` except `idempotency-unchanged-rerun`, which reports
 `expected-red (T024 → 006)`. Exit code `0`.
 
 ## Validation scenarios (map to spec stories)
 
-1. **Full flow, isolated (US1)**: `npm run harness`. Confirm all 6 scoring fixtures reach the
-   verdicts in `contracts/expected-matrix.md`, the summary counts match, and the isolation proof
-   shows zero non-loopback targets.
-2. **Per-worker contracts (US2)**: break one worker's fixture (e.g. point the settings reader at
-   tricky paths) and run that single case — it fails alone while all others stay green.
-3. **Service scenarios (US3)**: POST a `flapping` flip between two runs; confirm the mark updates
-   without disturbing the prior evaluation. Stop the service and confirm dependent cases fail fast
+Status as of 005 implementation (autonomous mode): node-runnable halves validated (N);
+in-session halves pending (S).
+
+1. **Full flow, isolated (US1)**: `npm run harness` (N: assertion layer + synthetic
+   scratches green). S: real session run via `--prep`/`--assert` above. Confirm all 6
+   scoring fixtures reach the verdicts in `contracts/expected-matrix.md`, the summary
+   counts match, and the isolation proof shows zero non-loopback targets.
+2. **Per-worker contracts (US2)**: break one worker fixture at a time (N: honesty/
+   verbatim/single-read/presence/audit cases green; each fault class covered) — S: prompt
+   each worker in-session and confirm the signal/verdicts agree with the node ground truth.
+3. **Service scenarios (US3)**: N: flip mechanics + fail-fast + wiring green. S: POST a
+   `flapping` flip between two session runs; confirm the mark updates without disturbing
+   the prior evaluation. Stop the service and confirm dependent cases fail fast
    with "fixture service unreachable".
-4. **Regression traceability (US4)**: reintroduce each historical fault from spec.md's table in
-   isolation (strip `inputs/` prefix; batch two evidence reads; transcribe instead of passthrough;
-   drop on audit rejection; re-score unconditionally) and confirm exactly its case turns red with
-   the historical symptom.
-5. **Idempotency expected-red**: run twice unchanged; confirm the case fails pointing at 006 and
-   the overall exit code still reflects only unexpected failures per
-   `contracts/harness-report.md`.
+4. **Regression traceability (US4)**: N: reintroduce each historical fault from spec.md's
+   table in isolation (strip `inputs/` prefix; batch two evidence reads; transcribe instead
+   of passthrough; drop on audit rejection; re-score unconditionally) — structural pins +
+   gate mirror assert each (fault-sweep + config-gate green). S: confirm the session
+   workflow exhibits the historical symptom for each.
+5. **Idempotency expected-red**: N: structural red present and routed to expected-red
+   (runner shows it, exit 0). S: run twice unchanged in-session; confirm the case fails
+   pointing at 006.
 
 ## Setup for a new machine
 
