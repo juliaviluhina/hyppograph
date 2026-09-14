@@ -46,7 +46,8 @@ in-session halves pending (S).
    Transport note (research.md R8): `hyppo-verify` cannot reach the plain-HTTP fixture
    service — WebFetch upgrades `http://` to `https://` unconditionally (proven 2026-09-14).
    Its wire behavior is proven instead against a real `https://` ATS endpoint via the
-   live smoke fixture (`tests/fixtures/live/`); the loopback service pins everything else.
+   live smoke fixture (`tests/fixtures/live/`; wire proof completed 2026-09-14 —
+   direct call returned `found` with the exact URL echoed); the loopback service pins everything else.
 3. **Service scenarios (US3)**: N: flip mechanics + fail-fast + wiring green. S: POST a
    `flapping` flip between two session runs; confirm the mark updates without disturbing
    the prior evaluation. Stop the service and confirm dependent cases fail fast

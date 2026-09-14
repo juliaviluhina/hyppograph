@@ -15,17 +15,24 @@ None from node. First real session run (2026-09-14T15:20:51Z, scratch asserted
 2026-09-14T15:38Z) produced 5 `unexpected-red` — three new production findings below.
 Artifacts: session summary in chat history; scratch dir was temp (deleted after assert).
 
-### F1 (ANSWERED 2026-09-14): tool fault — WebFetch upgrades http→https unconditionally
+### F1 (CLOSED 2026-09-14): tool fault, wire proven live
 
 Discriminator experiment result: the agent echoed the exact `http://127.0.0.1:8471/…` URL;
 WebFetch silently rewrote the scheme (documented tool behavior, no parameter changes it)
-and the TLS handshake failed. Service log held zero session requests. Design decision
-recorded in 005 research.md R8: split the proof — loopback service proves everything
-except the worker's wire behavior; `hyppo-verify` wire behavior is proven in-session
-against a real `https://` ATS endpoint (the `tests/fixtures/live/` smoke fixture).
-No code fix; no new tool grants. 006 action: run the live-smoke session check and
-document it; keep the cert/tool-grant options rejected unless deliberately reopened
-(Principle IV).
+and the TLS handshake failed. Service log held zero session requests. Wire proof
+completed same day: direct `hyppo-verify` call against the real
+`https://boards-api.greenhouse.io/v1/boards/figma/jobs/5783812004` (posting confirmed
+live via curl first) returned `signal: found` with the exact `https://` URL echoed —
+clean, no TLS error. Nothing wrong with hyppo-verify's logic or the ATS URL
+construction; only plain-HTTP local doubles are unreachable to it.
+Design decision recorded in 005 research.md R8 (split proof). No code fix; no new
+tool grants.
+OPEN QUESTION for 006: the matrix still expects confirmed-open/closed for the three
+ATS fixtures, which is unachievable in isolation while the wire only works over
+`https://`. Decide: keep them aspirational-red (the run stays RED as a standing
+reminder of the transport gap) or add an explicit transport-exemption to the
+expectations (run goes green, gap tracked here instead). Do NOT silently soften —
+either state must be deliberate and documented.
 
 ### F2 (new): write-run-summary silently not written — ack never checked
 
