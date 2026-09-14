@@ -5,7 +5,8 @@ any harness case may contact.
 
 ## Origin
 
-`http://127.0.0.1:<PORT>` — fixed port, documented in quickstart. If the port is taken, the
+`http://127.0.0.1:<PORT>` — fixed port, default `8471` (overridable via `HYPPO_HARNESS_PORT`;
+see `tests/harness/support/ports.mjs`). If the port is taken, the
 service exits non-zero naming the port and the likely stale process. It MUST NOT auto-pick a free
 port (a moved port silently invalidates every URL-shape assertion downstream).
 
