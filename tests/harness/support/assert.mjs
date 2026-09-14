@@ -66,7 +66,9 @@ function parseSummary(text) {
 }
 
 // Full check. Returns { cases, isolationProof } per contracts/harness-report.md.
-export function assertScratch(dir, accessLogFile) {
+// `expectations` defaults to SIGNAL_EXPECTATIONS; the flapping case (T021) passes
+// a flipped map for the post-flip run.
+export function assertScratch(dir, accessLogFile, expectations = SIGNAL_EXPECTATIONS) {
   const cases = [];
   const fail = (name, note) => cases.push({ name, verdict: "unexpected-red", note });
   const pass = (name) => cases.push({ name, verdict: "pass" });
@@ -81,7 +83,7 @@ export function assertScratch(dir, accessLogFile) {
   const evalVerdicts = readEvaluations(dir);
 
   // T010 — per-record matrix on the signal fixtures.
-  for (const [key, exp] of Object.entries(SIGNAL_EXPECTATIONS)) {
+  for (const [key, exp] of Object.entries(expectations)) {
     const name = `matrix:${key}`;
     const rec = records[key];
     if (!rec) { fail(name, "job record missing from scratch dir"); continue; }
@@ -111,7 +113,13 @@ export function assertScratch(dir, accessLogFile) {
       else pass("summary:scored-matches-files");
     }
   }
-  const closedWithEval = Object.keys(evalVerdicts).filter((k) => records[k]?.openStatus === "confirmed-closed");
+  // A closed record may still carry an evaluation when the mark flipped AFTER
+  // scoring (run-1 file left untouched by design — quickstart scenario 6). The
+  // rule therefore bans only UNEXPECTED evaluations on closed records: expected
+  // (evaluated:true) entries are exempt.
+  const closedWithEval = Object.keys(evalVerdicts).filter(
+    (k) => records[k]?.openStatus === "confirmed-closed" && expectations[k]?.evaluated !== true
+  );
   if (closedWithEval.length > 0) fail("summary:no-eval-on-closed", `evaluations exist for confirmed-closed: ${closedWithEval.join(", ")}`);
   else pass("summary:no-eval-on-closed");
 
@@ -121,7 +129,7 @@ export function assertScratch(dir, accessLogFile) {
   try {
     accessLog = fs.readFileSync(accessLogFile, "utf8").split("\n").filter(Boolean).map((l) => JSON.parse(l));
   } catch (e) {
-    fail("isolation:access-log", `cannot read access log: ${e.message}`);
+    fail("isolation:access-log", `fixture service unreachable or access log missing (${e.message}) — tests never fall back to a live host`);
     return { cases, isolationProof: { atsCallsInServiceLog: "unknown", nonLoopbackTargetsObserved: "unknown" } };
   }
   try {
