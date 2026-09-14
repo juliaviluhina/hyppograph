@@ -13,9 +13,9 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { harnessPort, assertPortFree } from "./support/ports.mjs";
 import { makeScratch } from "./support/scratch.mjs";
-import { assertLoopbackOnly, assertServiceLogCovers } from "./support/isolation.mjs";
-import { EXPECTED_RED_CASE, SIGNAL_EXPECTATIONS, overrideMap } from "./support/expectations.mjs";
-import { buildAtsApiUrl } from "./support/pure.mjs";
+import { assertLoopbackOnly } from "./support/isolation.mjs";
+import { EXPECTED_RED_CASE, overrideMap } from "./support/expectations.mjs";
+import { assertScratch } from "./support/assert.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const SERVICE = path.join(HERE, "service.mjs");
@@ -25,20 +25,6 @@ const REPORT = path.join(HERE, "last-report.md");
 function usage() {
   console.log(`usage: run.mjs [test] [--case=name] | --serve [--port N] | --prep | --assert --dir <scratch> --access-log <file>`);
   process.exit(2);
-}
-
-// ---- tiny front-matter reader (workflow files only; not a YAML parser) ----
-function readFrontMatter(file) {
-  const text = fs.readFileSync(file, "utf8");
-  const m = /^---\n([\s\S]*?)\n---/.exec(text);
-  const fm = {};
-  if (!m) return fm;
-  for (const line of m[1].split("\n")) {
-    const kv = /^([A-Za-z0-9_]+):\s*(.*)$/.exec(line.trim());
-    if (kv) fm[kv[1]] = kv[2].replace(/^"(.*)"$/, "$1");
-  }
-  fm.__sourceRefs = [...text.matchAll(/sourceRef:\s*"([^"]+)"/g)].map((x) => x[1]);
-  return fm;
 }
 
 // ---- report ----
@@ -125,60 +111,6 @@ function runNodeTests(filter) {
     cases.push({ name: "(runner)", verdict: "unexpected-red", note: "node --test crashed with no TAP output" });
   }
   return { cases };
-}
-
-// ---- --assert: check a session-run scratch dir ----
-function assertScratch(dir, accessLogFile) {
-  const cases = [];
-  const jrDir = path.join(dir, "outputs", "job-records");
-  const evDir = path.join(dir, "outputs", "evaluations");
-  const records = {};
-  for (const f of fs.readdirSync(jrDir)) {
-    if (!f.endsWith(".md")) continue;
-    const fm = readFrontMatter(path.join(jrDir, f));
-    if (fm.key) records[fm.key] = fm;
-  }
-  const evalVerdicts = {};
-  if (fs.existsSync(evDir)) {
-    for (const f of fs.readdirSync(evDir)) {
-      if (!f.endsWith(".md")) continue;
-      const fm = readFrontMatter(path.join(evDir, f));
-      if (fm.jobRecordKey) evalVerdicts[fm.jobRecordKey] = fm.overallVerdict;
-    }
-  }
-  for (const [key, exp] of Object.entries(SIGNAL_EXPECTATIONS)) {
-    const rec = records[key];
-    const fail = (note) => cases.push({ name: `matrix:${key}`, verdict: "unexpected-red", note });
-    if (!rec) { fail("job record missing from scratch dir"); continue; }
-    if (rec.openStatus !== exp.mark) { fail(`mark is ${rec.openStatus ?? "null"}, expected ${exp.mark}`); continue; }
-    const verdict = evalVerdicts[key];
-    if (exp.evaluated && verdict === undefined) { fail("expected evaluation file, none found"); continue; }
-    if (!exp.evaluated && verdict !== undefined) { fail("expected no evaluation file, one exists"); continue; }
-    if (exp.verdict && verdict !== exp.verdict) { fail(`verdict is ${verdict}, expected ${exp.verdict}`); continue; }
-    cases.push({ name: `matrix:${key}`, verdict: "pass" });
-  }
-  // isolation, session-run form: every ATS-derived mark must have a matching
-  // local service-log request for its posting path (prod-API path == service path).
-  let accessLog = [];
-  try {
-    accessLog = fs.readFileSync(accessLogFile, "utf8").split("\n").filter(Boolean).map((l) => JSON.parse(l));
-  } catch (e) {
-    cases.push({ name: "isolation:access-log", verdict: "unexpected-red", note: `cannot read access log: ${e.message}` });
-    return { cases, isolationProof: { atsCallsInServiceLog: "unknown", nonLoopbackTargetsObserved: "unknown" } };
-  }
-  try {
-    const expectedPaths = [];
-    for (const rec of Object.values(records)) {
-      const prod = buildAtsApiUrl(rec.__sourceRefs ?? [], {});
-      if (prod) expectedPaths.push(new URL(prod).pathname);
-    }
-    assertServiceLogCovers(accessLog, expectedPaths);
-    cases.push({ name: "isolation:service-log-covers", verdict: "pass" });
-  } catch (e) {
-    cases.push({ name: "isolation:service-log-covers", verdict: "unexpected-red", note: e.message });
-  }
-  const requests = accessLog.filter((r) => r.type === "request");
-  return { cases, isolationProof: { atsCallsInServiceLog: requests.length, nonLoopbackTargetsObserved: "n/a (session run: routing came only from the printed override map)" } };
 }
 
 // ---- main ----
