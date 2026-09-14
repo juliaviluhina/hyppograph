@@ -9,6 +9,7 @@
 // Prints `HARNESS_SERVICE origin=<origin>` on stdout when ready.
 import http from "node:http";
 import fs from "node:fs";
+import path from "node:path";
 
 const SCENARIOS = new Set(["live", "closed", "malformed", "error", "flapping"]);
 
@@ -27,6 +28,11 @@ function parseArgs(argv) {
 }
 
 const opts = parseArgs(process.argv.slice(2));
+if (opts.accessLog) {
+  // The log directory may not exist yet (fresh scratch); create it instead of
+  // crashing on the first logged request.
+  fs.mkdirSync(path.dirname(opts.accessLog), { recursive: true });
+}
 const scenarioMap = new Map(); // path -> scenario; unset paths default to "live"
 if (opts.scenarios) {
   const loaded = JSON.parse(fs.readFileSync(opts.scenarios, "utf8"));
