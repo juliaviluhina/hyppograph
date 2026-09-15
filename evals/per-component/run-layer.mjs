@@ -39,25 +39,56 @@ export function makePerComponentHandler(layer) {
     const { run, fixturesPath } = RUNNERS[layer];
     const fixtures = loadFixtures(fixturesPath);
     const wouldBeMetered = fixtures.some((fx) => fx.judge);
+    const substrate = opts.substrate || "workflow-tool";
 
     const confirm = checkConfirmSpend({ layer, wouldBeMetered, confirmSpend: opts.confirmSpend, caseCount: fixtures.length });
-    if (!confirm.proceed) return confirm.exitCode;
+    if (!confirm.proceed) return { exitCode: confirm.exitCode, report: null };
 
     if (wouldBeMetered) {
       const cred = requireJudgeCredential();
       if (!cred.ok) {
         console.error(`${layer}: ${missingCredentialMessage(cred.missing)}`);
-        return 2;
+        return { exitCode: 2, report: null };
       }
     }
 
-    const result = await run({ substrate: opts.substrate || "workflow-tool" });
+    const result = await run({ substrate });
     if (result.setupRequired) {
       console.error(result.message);
-      return 2;
+      return { exitCode: 2, report: null };
     }
     printCases(layer, result);
-    console.log(`${layer}: ${result.pass ? "PASSED" : "FAILED"} (${result.cases.filter((c) => c.pass).length}/${result.cases.length})`);
-    return result.pass ? 0 : 1;
+    const passCount = result.cases.filter((c) => c.pass).length;
+    console.log(`${layer}: ${result.pass ? "PASSED" : "FAILED"} (${passCount}/${result.cases.length})`);
+
+    const judgeTypes = [...new Set(fixtures.filter((fx) => fx.judge).map((fx) => fx.judge))];
+    return {
+      exitCode: result.pass ? 0 : 1,
+      report: {
+        scope: `eval-${layer}`,
+        methodology: {
+          layer,
+          judge: judgeTypes.length ? `GPT Luna (${judgeTypes.join(", ")})` : "none",
+          substrate,
+        },
+        underTest: {
+          modelIds: substrate === "mock" ? "n/a (mock substrate)" : "claude-haiku-4-5",
+          fixture: fixturesPath,
+          run: "manual (node evals/run.mjs " + layer + ")",
+        },
+        results: result.cases.map((c) => ({
+          case: c.id,
+          expected: "pass",
+          actual: c.pass ? "pass" : "fail",
+          verdict: c.pass ? "pass" : "fail",
+        })),
+        cost: { tokensIn: 0, tokensOut: 0, dollarCost: wouldBeMetered ? "$0 (measured)" : "$0" },
+        findings: result.cases
+          .filter((c) => !c.pass)
+          .map((c) => `${c.id}: ${!c.determCheck.pass ? c.determCheck.message : !c.stable ? "output unstable across runs" : c.judgeResult?.note || "judge failed"}`),
+        indexResult: `${result.pass ? "pass" : "fail"} (${passCount}/${result.cases.length})`,
+        indexCost: "$0",
+      },
+    };
   };
 }

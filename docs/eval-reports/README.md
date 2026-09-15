@@ -25,3 +25,8 @@ account's recorded spend for the same runs within 10% or $1, whichever is larger
 | 0002 | 2026-09-14 | integration | pass (2/2) | $0 | cadc28f |
 | 0003 | 2026-09-14 | component | pass (57/57) | $0 | 807779a |
 | 0004 | 2026-09-15 | eval-enumerate, eval-pre-triage, eval-extraction, eval-source-list | pass (10/10) | $0 | f783486 |
+| 0005 | 2026-09-15 | component | pass (57/57) | $0 | e09328e |
+| 0006 | 2026-09-15 | integration | pass (2/2) | $0 | e09328e |
+| 0007 | 2026-09-15 | eval-enumerate | pass (2/2) | $0 | e09328e |
+| 0008 | 2026-09-15 | eval-pre-triage | pass (3/3) | $0 | e09328e |
+| 0009 | 2026-09-15 | eval-extraction | pass (2/2) | $0 | e09328e |

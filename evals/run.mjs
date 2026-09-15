@@ -5,10 +5,11 @@
 // unimplemented rather than silently no-opping.
 
 import { parseArgs } from "node:util";
-import { spawnSync } from "node:child_process";
+import { spawnSync, execFileSync } from "node:child_process";
 import { isAbsolute, resolve } from "node:path";
 import { runIntegrationLayer } from "./integration/run-layer.mjs";
 import { makePerComponentHandler } from "./per-component/run-layer.mjs";
+import { writeReport } from "./lib/report.mjs";
 
 const LAYERS = [
   "component",
@@ -54,8 +55,26 @@ export function parseCli(argv) {
 // component is always free (contracts/evals-cli.md) — never imports the judge client, the SDK, or
 // anything that opens a socket. Delegates straight to `node --test`.
 function runComponent() {
-  const res = spawnSync(process.execPath, ["--test", "evals/component/"], { stdio: "inherit" });
-  return res.status === 0 ? 0 : 1;
+  const res = spawnSync(process.execPath, ["--test", "evals/component/"], { encoding: "utf8" });
+  process.stdout.write(res.stdout || "");
+  process.stderr.write(res.stderr || "");
+  const combined = (res.stdout || "") + (res.stderr || "");
+  const total = Number(combined.match(/ℹ tests (\d+)/)?.[1] ?? 0);
+  const pass = Number(combined.match(/ℹ pass (\d+)/)?.[1] ?? 0);
+  const fail = total - pass;
+  return {
+    exitCode: res.status === 0 ? 0 : 1,
+    report: {
+      scope: "component",
+      methodology: { layer: "component", judge: "none", substrate: "n/a" },
+      underTest: { modelIds: "n/a", fixture: "none (inline unit cases + static checks)", run: "manual (npm test)" },
+      results: [{ case: `${total} node:test cases`, expected: "all pass", actual: `${pass}/${total} pass`, verdict: fail === 0 ? "pass" : "fail" }],
+      cost: { tokensIn: 0, tokensOut: 0, dollarCost: "$0" },
+      findings: [],
+      indexResult: `${fail === 0 ? "pass" : "fail"} (${pass}/${total})`,
+      indexCost: "$0",
+    },
+  };
 }
 
 // live-smoke (contracts/evals-cli.md): a shallow real run against a HyppoVisor board search,
@@ -112,6 +131,18 @@ function checkMeteredSubstrateBuilt(opts) {
   return 2;
 }
 
+function gitShortSha() {
+  try {
+    return execFileSync("git", ["rev-parse", "--short", "HEAD"], { encoding: "utf8" }).trim();
+  } catch {
+    return "unknown";
+  }
+}
+
+function todayIso() {
+  return new Date().toISOString().slice(0, 10);
+}
+
 export async function run(argv) {
   const opts = parseCli(argv);
   if (!opts.layer || !(opts.layer in handlers)) {
@@ -125,7 +156,26 @@ export async function run(argv) {
     console.error(`layer ${JSON.stringify(opts.layer)} is not wired yet`);
     return 2;
   }
-  return handler(opts);
+
+  const outcome = await handler(opts);
+  const { exitCode, report } = typeof outcome === "number" ? { exitCode: outcome, report: null } : outcome;
+
+  // SC-009: every REAL run leaves a report; a no-op (spend estimate printed, precondition failure,
+  // manual live-smoke handoff) has nothing to report and is skipped. --no-report is local-iteration
+  // only (contracts/evals-cli.md).
+  if (report && !opts.noReport) {
+    const date = todayIso();
+    const commit = gitShortSha();
+    try {
+      const path = writeReport({ ...report, date, commit, underTest: { ...report.underTest, commit } });
+      console.log(`report written: ${path}`);
+    } catch (err) {
+      console.error(err.message);
+      return 1;
+    }
+  }
+
+  return exitCode;
 }
 
 const isMain = import.meta.url === `file://${process.argv[1]}`;

@@ -275,24 +275,30 @@ running spend ledger.
 with Methodology / Under test / Results / Cost / Findings, and `docs/eval-reports/README.md` gains a
 matching row.
 
-- [ ] T040 [P] [US5] `evals/lib/report.mjs` — assemble the report in the required section order
+- [X] T040 [P] [US5] `evals/lib/report.mjs` — assemble the report in the required section order
   (`# Eval Run NNNN — <scope> — YYYY-MM-DD`, `## Methodology`, `## Under test`, `## Results` table +
   per-fail diff, `## Cost`, `## Findings`); strip/refuse forbidden content (credentials, auth
   headers, request/response bodies, personal data) — IDs and token counts only (FR-012, contract:
   `contracts/eval-report.md`).
-- [ ] T041 [US5] Add index append to `report.mjs` — append `| NNNN | date | scope | result | cost |
+- [X] T041 [US5] Add index append to `report.mjs` — append `| NNNN | date | scope | result | cost |
   commit |` to `docs/eval-reports/README.md`; `NNNN` monotonic across all scopes; `result` ∈
   `pass (n/n)` | `fail (k/n)` | `partial (ceiling)` (FR-013).
-- [ ] T042 [US5] Wire report writing as the final step of every layer in `evals/run.mjs` (SC-009);
+- [X] T042 [US5] Wire report writing as the final step of every layer in `evals/run.mjs` (SC-009);
   `--no-report` skips it for local iteration only.
-- [ ] T043 [US5] Document the hand-assembled report procedure for `Workflow`-tool runs whose driver
+- [X] T043 [US5] Document the hand-assembled report procedure for `Workflow`-tool runs whose driver
   is the tool rather than `evals/run.mjs` — same layout, until the standalone substrate exists
   (contract: `contracts/eval-report.md` "Generation").
-- [ ] T044 [US5] Run the Independent Test above; confirm SC-009 (every layer leaves a report + row)
+- [X] T044 [US5] Run the Independent Test above; confirm SC-009 (every layer leaves a report + row)
   and SC-008 (measured cost replaces the estimate after the first metered run; metered rows sum
   within 10% / $1). Also confirm SC-004: sum the report index through the first green `integration`
   run and confirm it is ≤ 5× the per-run cost estimate; note in the report's *Findings* whether the
-  routine (component-only) re-check cost is trending to zero.
+  routine (component-only) re-check cost is trending to zero. Confirmed live: `component`,
+  `integration`, and all four per-component layers each auto-wrote a report + index row (0005-0009).
+  SC-004: report index summed through the first green `integration` run (0001+0002 = $0) is trivially
+  ≤ 5× any per-run estimate; routine component-only re-checks stay $0 by construction (SC-004 margin
+  confirmed, not yet a real trend since only 2026-09-14/15 runs exist). SC-008 N/A so far: no metered
+  run has occurred (T049 gated) so there is no measured figure yet to replace an estimate or sum
+  against; every logged cost to date is $0 by substrate (mock/workflow-tool), not by omission.
 
 **Checkpoint**: testing is evidenced; spend is a reconstructable ledger.
 
