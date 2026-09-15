@@ -31,8 +31,8 @@ Single project, no `src/`. Production code: `.claude/workflows/*.js`. New test t
 
 **Purpose**: Wire up the new Tier-2 npm entry point and directory.
 
-- [ ] T001 Add `"test:fidelity": "node --test tests/fidelity/"` to the `scripts` block in `package.json`
-- [ ] T002 [P] Create `tests/fidelity/README.md` documenting the tier's shape (one real `agent()` call per test, no fixture service, no scratch dir — mirrors `tests/harness/README.md`'s style) and linking `contracts/atomic-fidelity-test.md`
+- [X] T001 Add `"test:fidelity": "node --test tests/fidelity/"` to the `scripts` block in `package.json`
+- [X] T002 [P] Create `tests/fidelity/README.md` documenting the tier's shape (one real `agent()` call per test, no fixture service, no scratch dir — mirrors `tests/harness/README.md`'s style) and linking `contracts/atomic-fidelity-test.md`
 
 ---
 
@@ -42,8 +42,8 @@ Single project, no `src/`. Production code: `.claude/workflows/*.js`. New test t
 
 **⚠️ CRITICAL**: Complete before any US1/US2 test task.
 
-- [ ] T003 Create `tests/fidelity/support/run-workflow.mjs` exporting `async function runFidelityWorkflow(workflowRelPath, args)`: allocates one throwaway temp file path via `fs.mkdtempSync` (no fixture directory copy), shells out to `claude -p` instructing it to invoke the Workflow tool on `.claude/workflows/../../<workflowRelPath>` (i.e. the path relative to `tests/fidelity/`) with `args` (including the temp file path), waits for the session to finish, and returns `{ tempFilePath, cleanup() }` (`cleanup()` deletes the temp file)
-- [ ] T004 [P] Create `tests/fidelity/support/assert-bytes.mjs` exporting `function assertByteIdentical(actualPath, expectedContent)`: reads `actualPath`, throws an `Error` with an actual-vs-expected diff in its message if the bytes differ from `expectedContent` (first line included)
+- [X] T003 Create `tests/fidelity/support/run-workflow.mjs` exporting `async function runFidelityWorkflow(workflowRelPath, args)`: allocates one throwaway temp file path via `fs.mkdtempSync` (no fixture directory copy), shells out to `claude -p` instructing it to invoke the Workflow tool on `.claude/workflows/../../<workflowRelPath>` (i.e. the path relative to `tests/fidelity/`) with `args` (including the temp file path), waits for the session to finish, and returns `{ tempFilePath, cleanup() }` (`cleanup()` deletes the temp file)
+- [X] T004 [P] Create `tests/fidelity/support/assert-bytes.mjs` exporting `function assertByteIdentical(actualPath, expectedContent)`: reads `actualPath`, throws an `Error` with an actual-vs-expected diff in its message if the bytes differ from `expectedContent` (first line included)
 
 **Checkpoint**: `tests/fidelity/support/` exists and is importable — US1 can now start.
 
@@ -57,9 +57,10 @@ proving the fix's mechanism, not just the absence of the symptom.
 **Independent Test**: Per spec — strip the BEGIN-CONTENT/END-CONTENT markers from the test's own
 prompt copy, confirm it fails naming the byte mismatch; restore, confirm it passes.
 
-- [ ] T005 [P] [US1] Create `tests/fidelity/write-evaluation.workflow.js`: a minimal dynamic-workflow script (no `import`, no `fs`/shell/network in the body — see `contracts/atomic-fidelity-test.md`) that builds the same BEGIN-CONTENT/END-CONTENT-wrapped prompt shape as `fit-screen.js`'s `buildEvaluationWritePrompt` (audit #1) against one small inline synthetic record, and makes exactly one `agent()` call (`agentType: "hyppo-readwrite"`, `model: FAST`, `label: "write-evaluation"`) writing to the temp file path passed in via `args`
-- [ ] T006 [US1] Create `tests/fidelity/write-evaluation.test.mjs`: uses `runFidelityWorkflow` (T003) to run T005's script, then `assertByteIdentical` (T004) to confirm the written file matches the expected content byte-for-byte, including the leading `---`; depends on T003, T004, T005
+- [X] T005 [P] [US1] Create `tests/fidelity/write-evaluation.workflow.js`: a minimal dynamic-workflow script (no `import`, no `fs`/shell/network in the body — see `contracts/atomic-fidelity-test.md`) that builds the same BEGIN-CONTENT/END-CONTENT-wrapped prompt shape as `fit-screen.js`'s `buildEvaluationWritePrompt` (audit #1) against one small inline synthetic record, and makes exactly one `agent()` call (`agentType: "hyppo-readwrite"`, `model: FAST`, `label: "write-evaluation"`) writing to the temp file path passed in via `args`
+- [X] T006 [US1] Create `tests/fidelity/write-evaluation.test.mjs`: uses `runFidelityWorkflow` (T003) to run T005's script, then `assertByteIdentical` (T004) to confirm the written file matches the expected content byte-for-byte, including the leading `---`; depends on T003, T004, T005
 - [ ] T007 [US1] Validate SC-001 per `quickstart.md` §2: temporarily remove the BEGIN-CONTENT/END-CONTENT markers from T005's script, run `npm run test:fidelity`, confirm T006 fails with a diff showing the dropped `---`; restore the markers, confirm it passes again; record the result (pass) in the PR description, no code change retained from this step
+  - **BLOCKED in agent-driven sessions**: `npm run test:fidelity` shells out to `claude -p --dangerously-skip-permissions` (research.md R1). When that command is itself run from inside a Claude Code agent's Bash tool, auto-mode's classifier denies it outright ("Create Unsafe Agents") before the Workflow tool ever runs — confirmed 2026-09-14, see `run-workflow.mjs`'s header comment. This is not a bug in the test tier's design; it is specific to nested-agent spawning from within another agent session. **Run this task from a plain human terminal** (not through an agent's Bash tool) to complete it.
 
 **Checkpoint**: `npm run test:fidelity` passes with one test (write-evaluation). US1 independently shippable.
 
@@ -73,12 +74,12 @@ prompt copy, confirm it fails naming the byte mismatch; restore, confirm it pass
 **Independent Test**: Per spec — both `write-run-summary` prompts wrapped in
 BEGIN-CONTENT/END-CONTENT markers, each with its own passing atomic test.
 
-- [ ] T008 [P] [US2] In `.claude/workflows/fit-screen.js`, wrap `writeSummary()`'s prompt content (`rendered`, currently `[instruction, "", rendered].join("\n")` around line 1023) in `BEGIN-CONTENT`/`END-CONTENT` markers, matching audit #1's already-shipped wording (`buildEvaluationWritePrompt`, same file, ~line 1206)
-- [ ] T009 [P] [US2] Apply the same marker fix to `intake-normalize.js`'s write-run-summary prompt (`[instruction, "", rendered].join("\n")` around line 841)
-- [ ] T010 [P] [US2] Create `tests/fidelity/write-run-summary-fit-screen.workflow.js`, one `agent()` call mirroring T008's fixed prompt shape against an inline synthetic summary, writing to the temp file passed via `args`
-- [ ] T011 [P] [US2] Create `tests/fidelity/write-run-summary-intake.workflow.js`, one `agent()` call mirroring T009's fixed prompt shape against an inline synthetic summary
-- [ ] T012 [US2] Create `tests/fidelity/write-run-summary-fit-screen.test.mjs` (uses T003/T004 helpers, runs T010's script, asserts byte-exact output); depends on T003, T004, T008, T010
-- [ ] T013 [US2] Create `tests/fidelity/write-run-summary-intake.test.mjs` (uses T003/T004 helpers, runs T011's script, asserts byte-exact output); depends on T003, T004, T009, T011
+- [X] T008 [P] [US2] In `.claude/workflows/fit-screen.js`, wrap `writeSummary()`'s prompt content (`rendered`, currently `[instruction, "", rendered].join("\n")` around line 1023) in `BEGIN-CONTENT`/`END-CONTENT` markers, matching audit #1's already-shipped wording (`buildEvaluationWritePrompt`, same file, ~line 1206)
+- [X] T009 [P] [US2] Apply the same marker fix to `intake-normalize.js`'s write-run-summary prompt (`[instruction, "", rendered].join("\n")` around line 841)
+- [X] T010 [P] [US2] Create `tests/fidelity/write-run-summary-fit-screen.workflow.js`, one `agent()` call mirroring T008's fixed prompt shape against an inline synthetic summary, writing to the temp file passed via `args`
+- [X] T011 [P] [US2] Create `tests/fidelity/write-run-summary-intake.workflow.js`, one `agent()` call mirroring T009's fixed prompt shape against an inline synthetic summary
+- [X] T012 [US2] Create `tests/fidelity/write-run-summary-fit-screen.test.mjs` (uses T003/T004 helpers, runs T010's script, asserts byte-exact output); depends on T003, T004, T008, T010
+- [X] T013 [US2] Create `tests/fidelity/write-run-summary-intake.test.mjs` (uses T003/T004 helpers, runs T011's script, asserts byte-exact output); depends on T003, T004, T009, T011
 
 **Checkpoint**: `npm run test:fidelity` passes with all three tests (write-evaluation, both write-run-summary). US1+US2 shippable together.
 
@@ -92,10 +93,10 @@ prompt) at the node-only tier, and a linkable convention doc is referenced from 
 **Independent Test**: Per spec — a new verbatim-write prompt added without markers makes the
 structural pin fail (`npm run harness`), naming the offending call site.
 
-- [ ] T014 [P] [US3] Add a one-line reference to `specs/007-write-fidelity-guardrails/contracts/verbatim-write.md` in `.claude/workflows/fit-screen.js`'s module header comment block (near the top, alongside the existing `Spec:` line)
-- [ ] T015 [P] [US3] Add the same reference in `.claude/workflows/intake-normalize.js`'s module header comment block
-- [ ] T016 [US3] In `tests/harness/support/structure.mjs`: add an `INTAKE_WORKFLOW` path constant (mirroring the existing `WORKFLOW` constant, pointing at `intake-normalize.js`) and an `intakeWorkflowSource()` reader; then add `hasVerbatimWriteMarkers(site, src)` (or three named functions, one per site) that greps the given source text for both literal `BEGIN-CONTENT` and `END-CONTENT` substrings, applied to: audit #1 (`fit-screen.js`, `buildEvaluationWritePrompt`), audit #2 (`fit-screen.js`, `writeSummary`, post-T008), audit #3 (`intake-normalize.js`, write-run-summary, post-T009) — per `contracts/verbatim-write.md`'s literal-string-check contract; depends on T008, T009
-- [ ] T017 [US3] Create `tests/harness/regression-cases/verbatim-write-markers.test.mjs` (mirroring `fault-sweep.test.mjs`'s import-and-`assert.ok` pattern) importing T016's pin function(s) and asserting all three in-class sites pass; depends on T016
+- [X] T014 [P] [US3] Add a one-line reference to `specs/007-write-fidelity-guardrails/contracts/verbatim-write.md` in `.claude/workflows/fit-screen.js`'s module header comment block (near the top, alongside the existing `Spec:` line)
+- [X] T015 [P] [US3] Add the same reference in `.claude/workflows/intake-normalize.js`'s module header comment block
+- [X] T016 [US3] In `tests/harness/support/structure.mjs`: add an `INTAKE_WORKFLOW` path constant (mirroring the existing `WORKFLOW` constant, pointing at `intake-normalize.js`) and an `intakeWorkflowSource()` reader; then add `hasVerbatimWriteMarkers(site, src)` (or three named functions, one per site) that greps the given source text for both literal `BEGIN-CONTENT` and `END-CONTENT` substrings, applied to: audit #1 (`fit-screen.js`, `buildEvaluationWritePrompt`), audit #2 (`fit-screen.js`, `writeSummary`, post-T008), audit #3 (`intake-normalize.js`, write-run-summary, post-T009) — per `contracts/verbatim-write.md`'s literal-string-check contract; depends on T008, T009
+- [X] T017 [US3] Create `tests/harness/regression-cases/verbatim-write-markers.test.mjs` (mirroring `fault-sweep.test.mjs`'s import-and-`assert.ok` pattern) importing T016's pin function(s) and asserting all three in-class sites pass; depends on T016
 
 **Checkpoint**: `npm run harness` passes with the new pin; `npm run harness && npm run test:fidelity` both green. Full spec (SC-001–SC-004) satisfied.
 

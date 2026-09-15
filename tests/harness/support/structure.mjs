@@ -8,10 +8,16 @@ import { fileURLToPath } from "node:url";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const WORKFLOW = path.resolve(HERE, "..", "..", "..", ".claude", "workflows", "fit-screen.js");
+const INTAKE_WORKFLOW = path.resolve(HERE, "..", "..", "..", ".claude", "workflows", "intake-normalize.js");
 const AGENTS = path.resolve(HERE, "..", "..", "..", ".claude", "agents");
 
 export function workflowSource() {
   return fs.readFileSync(WORKFLOW, "utf8");
+}
+
+// 007 — intake-normalize.js's own source, for pins that need to check across both workflow scripts.
+export function intakeWorkflowSource() {
+  return fs.readFileSync(INTAKE_WORKFLOW, "utf8");
 }
 
 // Run 6 pin: settings arrive as raw text and are parsed in code — never transcribed.
@@ -46,6 +52,35 @@ export function hasNonBlockingAudit(src = workflowSource()) {
 // restructures this, update the regex to match — never delete the pin silently.
 export function hasIdempotencyGuard(src = workflowSource()) {
   return /read-evaluation|existingEval|existing-evaluation|skip.*unchanged|unchanged.*skip/i.test(src);
+}
+
+// 007 FR-004/contracts/verbatim-write.md — literal-string pins for the three in-class
+// verbatim-write call sites (audit #1/#2/#3). Static source-text check only: greps the
+// function's own source slice for both marker strings, no AST parse, no execution.
+function sliceFromMarker(src, startMarker, endMarker) {
+  const start = src.indexOf(startMarker);
+  if (start < 0) return "";
+  const end = endMarker ? src.indexOf(endMarker, start) : src.length;
+  return src.slice(start, end < 0 ? src.length : end);
+}
+
+function hasMarkers(slice) {
+  return slice.includes("BEGIN-CONTENT") && slice.includes("END-CONTENT");
+}
+
+// Audit #1 — fit-screen.js buildEvaluationWritePrompt (write-evaluation).
+export function hasWriteEvaluationMarkers(src = workflowSource()) {
+  return hasMarkers(sliceFromMarker(src, "function buildEvaluationWritePrompt", "\n}\n"));
+}
+
+// Audit #2 — fit-screen.js writeSummary (write-run-summary).
+export function hasFitScreenSummaryMarkers(src = workflowSource()) {
+  return hasMarkers(sliceFromMarker(src, "async function writeSummary", "\n}\n"));
+}
+
+// Audit #3 — intake-normalize.js write-run-summary.
+export function hasIntakeSummaryMarkers(src = intakeWorkflowSource()) {
+  return hasMarkers(sliceFromMarker(src, "T040 — run summary", "log(\"run summary"));
 }
 
 // Run 2 pin: agent definitions exist with least-privilege grants.

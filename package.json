@@ -6,6 +6,7 @@
   "scripts": {
     "test": "node --test evals/component/",
     "eval": "node evals/run.mjs",
-    "harness": "node tests/harness/run.mjs"
+    "harness": "node tests/harness/run.mjs",
+    "test:fidelity": "node --test tests/fidelity/"
   }
 }

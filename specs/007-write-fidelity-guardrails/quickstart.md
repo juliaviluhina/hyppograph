@@ -18,6 +18,12 @@ in-class call sites (#1/#2/#3) once FR-003's marker fix lands on #2/#3. See
 **Regression check**: temporarily remove a `BEGIN-CONTENT`/`END-CONTENT` marker pair from one
 in-class prompt-builder function and re-run — the pin must fail, naming that call site.
 
+**Environment note (found 2026-09-14)**: `npm run test:fidelity` shells out to
+`claude -p --dangerously-skip-permissions` to reach the Workflow tool (research.md R1). Run it
+from a plain human terminal. Running it from inside another Claude Code agent's Bash tool is
+denied outright by that session's auto-mode classifier ("Create Unsafe Agents") before the
+Workflow tool ever executes — a nested-agent-spawning restriction, not a defect in this test tier.
+
 ## 2. Tier-2 — atomic fidelity tests (FR-001, FR-003)
 
 ```sh
