@@ -4,6 +4,10 @@
  * Feature 004: the next two pipeline steps after feature 001 — verify -> score.
  * Spec:  specs/004-retrieval-fit-screen-rework/
  *
+ * Verbatim-write convention (007): every "overwrite this file with literal content" agent() call
+ * MUST use the BEGIN-CONTENT/END-CONTENT marker convention — see
+ * specs/007-write-fidelity-guardrails/contracts/verbatim-write.md.
+ *
  * RUNTIME CONTRACT (Claude Code dynamic workflow — see the `workflow-authoring` skill)
  *   - Constrained JavaScript: no `import`, no `require`, no direct fs / shell / network from the
  *     script body. `Date.now()`, `Math.random()`, argless `new Date()` THROW — every timestamp/id
@@ -1018,9 +1022,19 @@ function renderSummary(s) {
 
 // 006 T011/F2/contracts/summary-write.md — single writer (hyppo-readwrite), checked ack, one
 // retry, loud log on persistent failure. Never a silent `false` (the F2 lesson).
+// 007 FR-003/contracts/verbatim-write.md — BEGIN-CONTENT/END-CONTENT markers: `rendered`'s first
+// line is always "Run <timestamp>" today, but nothing structurally guarantees that stays safe
+// (spec Edge Cases), so this shares audit #1's (F4) exact instruction/content boundary shape.
 async function writeSummary(dataDir, summary) {
   const rendered = renderSummary(summary);
-  const prompt = [`Write this exact text to ${dataDir}/outputs/last-run-summary-fit-screen.md (overwrite):`, "", rendered].join("\n");
+  const prompt = [
+    `Write the EXACT content between the BEGIN-CONTENT and END-CONTENT markers below (excluding the`,
+    `marker lines themselves — they are not part of the file) to ${dataDir}/outputs/last-run-summary-fit-screen.md (overwrite):`,
+    "",
+    "BEGIN-CONTENT",
+    rendered,
+    "END-CONTENT",
+  ].join("\n");
   const attempt = () =>
     agent(prompt, { schema: writtenAckSchema, label: "write-run-summary", model: FAST, agentType: "hyppo-readwrite" });
 

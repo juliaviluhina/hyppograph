@@ -4,6 +4,10 @@
  * Feature 001: the opening three pipeline steps — collect -> pre-triage -> normalize.
  * Spec:  specs/001-intake-normalize-pipeline/
  *
+ * Verbatim-write convention (007): every "overwrite this file with literal content" agent() call
+ * MUST use the BEGIN-CONTENT/END-CONTENT marker convention — see
+ * specs/007-write-fidelity-guardrails/contracts/verbatim-write.md.
+ *
  * RUNTIME CONTRACT (Claude Code dynamic workflow — see the `workflow-authoring` skill)
  *   - Constrained JavaScript: no `import`, no `require`, no direct fs / shell / network from the
  *     script body. `Date.now()`, `Math.random()`, argless `new Date()` THROW — every timestamp/id
@@ -835,12 +839,18 @@ phase("normalize");
 }
 
 /* ---- T040 — run summary: write outputs/last-run-summary.md and log it ---- */
+// 007 FR-003/contracts/verbatim-write.md — BEGIN-CONTENT/END-CONTENT markers: shares audit #1's
+// (F4) exact instruction/content boundary shape; `rendered`'s first line is not structurally
+// guaranteed safe (spec Edge Cases).
 const rendered = renderSummary(summary);
 await agent(
   [
-    `Write this exact text to ${DATA}/outputs/last-run-summary.md (overwrite):`,
+    `Write the EXACT content between the BEGIN-CONTENT and END-CONTENT markers below (excluding the`,
+    `marker lines themselves — they are not part of the file) to ${DATA}/outputs/last-run-summary.md (overwrite):`,
     "",
+    "BEGIN-CONTENT",
     rendered,
+    "END-CONTENT",
   ].join("\n"),
   {
     schema: writtenAckSchema,
