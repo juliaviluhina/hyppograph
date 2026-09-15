@@ -8,6 +8,12 @@
  *
  * args.outputPath : string — where to write (temp file, allocated by the Node test wrapper)
  */
+export const meta = {
+  name: "fidelity-write-evaluation",
+  description: "007 atomic regression test for audit #1's write-evaluation marker fix (F4).",
+  phases: [{ title: "write" }],
+};
+
 const frontMatter = ["---", 'jobRecordKey: "acme"', 'overallVerdict: "APPLY"', "---"].join("\n");
 const body = ["", "## Requirement table", "", "(synthetic fidelity-test fixture)", ""].join("\n");
 const content = frontMatter + body;

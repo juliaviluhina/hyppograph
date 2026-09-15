@@ -6,6 +6,12 @@
  *
  * args.outputPath : string — where to write (temp file, allocated by the Node test wrapper)
  */
+export const meta = {
+  name: "fidelity-write-run-summary-intake",
+  description: "007 atomic test for audit #3's write-run-summary marker fix (intake-normalize.js).",
+  phases: [{ title: "write" }],
+};
+
 const rendered = ["- newJobRecords: 1", "  duplicatesMerged: 0"].join("\n");
 
 const prompt = [

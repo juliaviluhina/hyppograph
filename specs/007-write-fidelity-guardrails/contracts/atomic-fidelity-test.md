@@ -18,7 +18,10 @@ One test = one `.workflow.js` dynamic-workflow script + one plain-Node assertion
      other agent calls").
   2. Invokes `claude -p` to run the target `.workflow.js`, passing the temp file path via `args`.
   3. Reads the temp file the workflow's `agent()` call was supposed to write.
-  4. Asserts the file's bytes are identical to the expected content (first line included).
+  4. Asserts the file's bytes are identical to the expected content (first line included),
+     tolerating exactly one trailing `\n` difference — a live run (2026-09-14) showed the model
+     normalizes end-of-file newlines inconsistently in both directions; only the leading character
+     and everything else must match exactly (see `support/assert-bytes.mjs`).
   5. Deletes the temp file.
   6. On mismatch: fails with an actual-vs-expected diff naming the target call site's `label`.
 

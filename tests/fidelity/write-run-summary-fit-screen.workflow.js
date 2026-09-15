@@ -7,6 +7,12 @@
  *
  * args.outputPath : string — where to write (temp file, allocated by the Node test wrapper)
  */
+export const meta = {
+  name: "fidelity-write-run-summary-fit-screen",
+  description: "007 atomic test for audit #2's write-run-summary marker fix (fit-screen.js).",
+  phases: [{ title: "write" }],
+};
+
 const rendered = [
   "- verified confirmed-open / confirmed-closed / unresolvable : 1 / 0 / 0",
   "  scored                  : 1",
