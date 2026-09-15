@@ -332,6 +332,29 @@ matching row.
   move (logged in a report's *Findings*), do the first metered `integration` run, and replace the
   cost estimate with the measured figure (SC-008). **Do not start without the user's go-ahead.**
 
+  Addendum (2026-09-15, pre-start reflection): researched and confirmed the Claude Pro/Max
+  subscription and the Anthropic API/Console are separate products with independent billing —
+  subscription usage cannot be spent against the API under any plan, and a subscription lapsing
+  (as the user's Pro plan did the same day) has no bearing on API access, since it was never
+  bundled. Preconditions before this task can start:
+  1. A separate console.anthropic.com account, payment method, and credit top-up (Anthropic's
+     minimum top-up is $5).
+  2. A decision on the credential's env var name — `ANTHROPIC_API_KEY` (the SDK's default) vs.
+     `HYPPO_METERED_API_KEY` (the placeholder already reserved in `.env.example`) — still open.
+  3. Awareness that a fresh Console account starts at usage tier 1 (low default rate limits); not
+     expected to block this workload's size, but a plausible source of a first-attempt 429.
+
+  Cost vision: the integration layer's own estimate (`evals/lib/spend.mjs`, Haiku 4.5 blended
+  ~$0.02/call) prices a 100-call run at ~$2. This task needs at minimum: one run to regenerate
+  `tests/synthetic/expected/` against the new substrate, one more to verify idempotency on that
+  regeneration (same pattern used to lock the tree originally), and one "first metered run" the
+  task itself calls for — ~$6 baseline — plus a realistic buffer for first-time SDK-wiring bugs
+  (auth header shape, response parsing) of 2-3 more runs (~$4-6). **Expected total ~$10-15**;
+  `eval-strategy.md` §6.2's own sizing note ("a few tens of dollars... heavy iteration could
+  roughly double that") is the conservative/worst-case bound (~$40-60), not the expectation.
+  Recommendation: top up $20 (above the $5 minimum, so no mid-task re-top-up) and pass
+  `--ceiling` on every run so a bug can't overspend unnoticed in one shot.
+
 ---
 
 ## Dependencies & Execution Order
