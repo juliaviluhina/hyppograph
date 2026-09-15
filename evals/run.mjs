@@ -6,6 +6,8 @@
 
 import { parseArgs } from "node:util";
 import { spawnSync } from "node:child_process";
+import { isAbsolute, resolve } from "node:path";
+import { runIntegrationLayer } from "./integration/run-layer.mjs";
 
 const LAYERS = [
   "component",
@@ -55,6 +57,38 @@ function runComponent() {
   return res.status === 0 ? 0 : 1;
 }
 
+// live-smoke (contracts/evals-cli.md): a shallow real run against a HyppoVisor board search,
+// scratch REQUIRED and MUST be outside the repo, requires --confirm-spend, output hand-judged.
+// The `Workflow` tool's `agent()` global only exists inside a Claude Code session — this plain-Node
+// script cannot drive it — so this handler enforces the CLI-level guardrails and hands off to a
+// human/Claude session for the actual run (US2 scenario 4).
+function runLiveSmoke(opts) {
+  if (!opts.scratch) {
+    console.error("live-smoke: --scratch is required and must be OUTSIDE the repo.");
+    return 2;
+  }
+  const abs = isAbsolute(opts.scratch) ? opts.scratch : resolve(opts.scratch);
+  const repoRoot = resolve(new URL("..", import.meta.url).pathname);
+  if (abs === repoRoot || abs.startsWith(repoRoot + "/")) {
+    console.error(`live-smoke: --scratch (${abs}) must be outside the repo (${repoRoot}).`);
+    return 2;
+  }
+  if (!opts.confirmSpend) {
+    console.log("live-smoke: plan-billed on the Workflow tool. Pass --confirm-spend to proceed.");
+    return 0;
+  }
+  console.log(
+    [
+      "live-smoke: this layer is driven manually — automation cannot invoke the Workflow tool.",
+      `  1. In a Claude Code session, run .claude/workflows/intake-normalize.js via the Workflow tool`,
+      `     with args.dataDir = ${abs}, against a real (shallow) HyppoVisor board search.`,
+      "  2. Hand-judge the output against the quickstart scenarios.",
+      "  3. Hand-assemble the eval report per contracts/eval-report.md \"Generation\".",
+    ].join("\n")
+  );
+  return 0;
+}
+
 // Dispatch table — one entry per contract layer token. `null` = not wired yet.
 const handlers = {
   component: runComponent,
@@ -62,8 +96,8 @@ const handlers = {
   "pre-triage": null,
   extraction: null,
   "source-list": null,
-  integration: null,
-  "live-smoke": null,
+  integration: runIntegrationLayer,
+  "live-smoke": runLiveSmoke,
 };
 
 export async function run(argv) {

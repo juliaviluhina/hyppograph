@@ -129,39 +129,45 @@ idempotency.
 `tests/synthetic/expected/` exactly, performs no network access, writes a report; the automatic
 second pass adds no files and leaves `provenance-log.md` byte-identical.
 
-- [ ] T017 [P] [US2] Author `tests/synthetic/data-dir/` — `inputs/settings.json` with tracked
+- [X] T017 [P] [US2] Author `tests/synthetic/data-dir/` — `inputs/settings.json` with tracked
   searches on a non-resolving host (`*.invalid` / RFC 2606) and criteria tuned so each reject bucket
   fires exactly once; `inputs/priorities.md` + minimal synthetic context; `raw/raw-*.md` = ~8
   postings covering cross-source duplicate pair, company-suffix wobble, excluded-location reject,
   no-direction-overlap reject, clearance reject, non-English, no-salary-no-location, already-applied;
   plus one manual-drop file and one `NOTES-*.md` non-posting (FR-003, FR-006; data-model
   "Failure-mode coverage").
-- [ ] T018 [P] [US2] Author `tests/synthetic/expected/outputs/` — `jobs/<companyKey>-<titleKey>.md`
+- [X] T018 [P] [US2] Author `tests/synthetic/expected/outputs/` — `jobs/<companyKey>-<titleKey>.md`
   (6 files), `companies.md`, `last-run-summary.md` (`newJobRecords: 6`, `duplicatesMerged: 1`, one
   count per reject bucket, all hand-derived), `provenance-log.md` (contract: `contracts/expected-tree.md`).
-- [ ] T019 [US2] `evals/integration/gate.mjs` — copy `tests/synthetic/data-dir/` to `--scratch`, run
+- [X] T019 [US2] `evals/integration/gate.mjs` — copy `tests/synthetic/data-dir/` to `--scratch`, run
   the workflow through the chosen substrate, byte-compare every file under `outputs/` to
   `expected/outputs/`, assert the file set matches, emit any deviation as a file-level unified diff
   (FR-004).
-- [ ] T020 [US2] `evals/integration/idempotency.mjs` — second pass over the same scratch dir: assert
+- [X] T020 [US2] `evals/integration/idempotency.mjs` — second pass over the same scratch dir: assert
   zero new files under `outputs/jobs/`, `last-run-summary.md` unchanged, `provenance-log.md`
   byte-identical (FR-005, feature 001 SC-006); reported as scope `integration-idem`.
-- [ ] T021 [US2] Wire the `integration` layer into `evals/run.mjs` — run `gate.mjs` then
+- [X] T021 [US2] Wire the `integration` layer into `evals/run.mjs` — run `gate.mjs` then
   `idempotency.mjs`, assert no network access occurred during either pass (FR-006), honour `--scratch`.
   The no-network assertion MUST be an active failure condition (any outbound connection attempt during
   a pass fails the layer and names the fixture/URL that reached out), so a hermeticity breach is
   *caught*, not merely absent — this is the eval-layer that covers SC-002's "a fixture reaching the
   live internet" class.
-- [ ] T022 [US2] Add the `live-smoke` path to `evals/run.mjs` — shallow real run against a HyppoVisor
+- [X] T022 [US2] Add the `live-smoke` path to `evals/run.mjs` — shallow real run against a HyppoVisor
   board search, `--scratch` **outside the repo**, requires `--confirm-spend`, output hand-judged
   (US2 scenario 4; contract: `contracts/evals-cli.md`).
-- [ ] T023 [US2] Run `integration` before and after the T004–T007 extraction; confirm identical
+- [X] T023 [US2] Run `integration` before and after the T004–T007 extraction; confirm identical
   expected tree (behaviour unchanged) and record the one-time expected-tree lock in the report's
-  *Findings* (FR-019, edge case "substrate change").
-- [ ] T024 [US2] Run the Independent Test above; confirm SC-003 (exact match + byte-identical
+  *Findings* (FR-019, edge case "substrate change"). N/A in practice: T006/T007 found the workflow's
+  inlined copy already byte-identical to the extracted modules, so there was no before/after
+  extraction to compare — recorded as such rather than a synthetic before/after run.
+- [X] T024 [US2] Run the Independent Test above; confirm SC-003 (exact match + byte-identical
   provenance on the second pass). Also confirm SC-002's fixture-hygiene class: point one synthetic
   tracked search at a resolving host, run `integration`, confirm the layer fails and names the
-  offending fixture; revert to the `*.invalid` host and confirm green.
+  offending fixture; revert to the `*.invalid` host and confirm green. Scope note: the mock
+  substrate's collect stage is a no-op by design (research D4/D7 — the dataset is pre-seeded, not
+  fetched), so it never dials out regardless of the configured host; the hermeticity guard itself
+  (`evals/lib/network-guard.mjs`) was verified directly — a `fetch()` call during a guarded window is
+  blocked and named — see eval report `0002-…-integration` Findings for the full scope statement.
 
 **Checkpoint**: deterministic integration gate replaces the eyeballed full-run loop.
 

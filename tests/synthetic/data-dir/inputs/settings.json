@@ -1,0 +1,39 @@
+{
+  "completeness": {
+    "setupReady": true,
+    "unresolved": []
+  },
+  "sections": {
+    "trackedBoards": {
+      "value": [
+        { "name": "Board A", "filteredSearch": "https://boards.invalid/search?a=1", "depth": 25 },
+        { "name": "Board B", "filteredSearch": "https://boards-b.invalid/search?b=1", "depth": 25 }
+      ]
+    },
+    "hardStops": {
+      "value": {
+        "excludedLocations": ["Antarctica"],
+        "lackedClearances": ["TS/SCI"],
+        "lackedWorkAuth": [],
+        "visaSponsorshipRequired": false
+      }
+    },
+    "locations": {
+      "value": {
+        "excluded": ["The Moon"]
+      }
+    },
+    "directions": {
+      "value": [
+        {
+          "name": "platform-backend",
+          "description": "Backend, platform, or infrastructure engineering roles."
+        },
+        {
+          "name": "software-engineering",
+          "description": "General software engineering roles including frontend, full-stack, or specialized engineering roles (excluding sales, marketing, and other non-engineering roles)."
+        }
+      ]
+    }
+  }
+}

@@ -47,12 +47,15 @@ output value is hand-derivable.
 The committed known-correct result of running the integration gate over the synthetic dataset.
 Byte-compared file by file; any mismatch is reported as a file-level diff (FR-004).
 
+Paths match the real `HYPPO_DATA_DIR` layout (corrected 2026-09-14 — see contracts/expected-tree.md):
+
 | Path | Asserted content |
 |---|---|
-| `outputs/jobs/<company>-<role>.md` | one file per kept posting; exact front-matter (dedup key, completeness, originalLanguage, applied status) and body |
-| `outputs/companies.md` | canonicalisation table — display names and the key each maps to |
+| `outputs/job-records/raw/<raw-record>.md` | pre-seeded raw record, with its written `triage:` block |
+| `outputs/job-records/<companyKey>--<titleKey>--<locKey>.md` | one file per kept role; exact front-matter (dedup key, completeness, originalLanguage, applied status) and body |
+| `outputs/job-records/companies.md` | canonicalisation table — display names and the key each maps to |
 | `outputs/last-run-summary.md` | exact counts: `newJobRecords`, `duplicatesMerged`, per-bucket reject counts |
-| `outputs/provenance-log.md` | exact provenance lines, in order |
+| `provenance-log.md` (data-dir root) | exact provenance lines, in order |
 
 **Re-lock**: moving the model-backed layers between substrates (FR-019) or a deliberate pipeline
 field change (edge case) requires regenerating this tree; each re-lock is a logged step in an eval
