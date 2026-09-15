@@ -49,11 +49,11 @@ flowchart TD
     D_what --> D_why --> D_how
   end
 
-  subgraph E["⑤ Per-component eval harness (003) — PLANNED"]
+  subgraph E["⑤ Layered eval harness (003)"]
     direction TB
-    E_what["WHAT<br/>judge-graded judgment quality — extraction faithfulness,<br/>triage-reason correctness, stability across reruns"]:::planned
-    E_why["WHY<br/>measure judgment quality, not just wiring/plumbing"]:::planned
-    E_how["HOW<br/>evals/run.mjs + non-Claude judge model — SCAFFOLDED ONLY,<br/>evals/ dirs exist but no runner code yet"]:::planned
+    E_what["WHAT<br/>free component+integration layers, plus judge-graded<br/>judgment quality — extraction faithfulness, triage-reason<br/>correctness"]:::live
+    E_why["WHY<br/>measure judgment quality, not just wiring/plumbing"]:::live
+    E_how["HOW<br/>evals/run.mjs + non-Claude judge (GPT Luna) —<br/>see docs/eval-harness.md; standalone metered<br/>substrate (T049) still gated on credit approval"]:::live
     E_what --> E_why --> E_how
   end
 
@@ -65,7 +65,7 @@ flowchart TD
     F_what --> F_why --> F_how
   end
 
-  A --> B --> C --> D -.-> E
+  A --> B --> C --> D --> E
   D -.-> F
 ```
 
@@ -111,12 +111,16 @@ See [`tests/fidelity/README.md`](../tests/fidelity/README.md) and
 
 ## Eval harness and evidence reports
 
-`evals/` holds the broader eval scaffold (component, per-component, integration) that
-predates and complements the isolated harness — per-component rubrics and fixtures,
-integration runs, and a **spend ledger**: every metered eval run is logged as a dated
-report in [`docs/eval-reports/`](./eval-reports/README.md), so cost stays auditable
-against the account's actual recorded spend. No run is triggered automatically — no
-CI, no push/PR hooks; every metered run is started by hand.
+`evals/` — a four-layer harness (component, integration+idempotency, per-component,
+live-smoke) that complements the isolated harness with **judgment-quality** checks: a
+non-Claude judge (GPT Luna) grades extraction faithfulness and triage-reason
+soundness against explicit rubrics, on top of the deterministic checks the other
+tiers already cover. Every run — free or metered — leaves a dated report in
+[`docs/eval-reports/`](./eval-reports/README.md), which doubles as the **spend
+ledger** so cost stays auditable against the account's actual recorded spend. No run
+is triggered automatically — no CI, no push/PR hooks; every run is started by hand.
+Full design, the judge's exact settings, how to run each layer, and input/output per
+layer: [Eval harness](./eval-harness.md).
 
 ## Q&A: models and credentials
 
@@ -142,11 +146,13 @@ than your own terminal) trips a classifier that blocks spawning
 child process exits 0 but stdout is just the denial message, so no real model call
 happens. Run this suite directly from your terminal.
 
-**Where do `HYPPO_JUDGE_API_KEY` / `HYPPO_JUDGE_BASE_URL` / `HYPPO_JUDGE_MODEL` fit
-in?** They're placeholder names in `.env.example` for feature 003's non-Claude judge
-model (used for judge-graded per-component eval cases). `evals/` is currently empty
-directory scaffolding — no runner code reads those vars yet, so they're a reserved
-spot for unbuilt work, not something a working setup is missing.
+**Where do `HYPPO_JUDGE_API_KEY` / `HYPPO_JUDGE_BASE_URL` / `HYPPO_JUDGE_MODEL` /
+`HYPPO_JUDGE_EFFORT` fit in?** They configure feature 003's non-Claude judge (GPT
+Luna, reached via `evals/lib/judge.mjs`), used for the two judge-graded
+per-component eval cases (`pre-triage`, `extraction`). Verified live — see
+[Eval harness → LLM-as-a-judge settings](./eval-harness.md#llm-as-a-judge-settings)
+for the exact request/response shape and why `x-opencode-session` is required but
+not a credential.
 
 ## Manual validation
 
