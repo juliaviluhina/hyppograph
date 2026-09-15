@@ -1,0 +1,42 @@
+[
+  {
+    "id": "enumerate-synthetic-raw-dir",
+    "input": { "rawDir": "tests/synthetic/data-dir/outputs/job-records/raw/" },
+    "mockResult": {
+      "records": [
+        { "path": "manual-massive-dynamic-platform-engineer.md", "id": "inputs/manual-postings/massive-dynamic-platform-engineer.md", "availability": "ok", "body": "" },
+        { "path": "raw-acme-boarda.md", "id": "https://boards.invalid/postings/acme-backend-1", "availability": "ok", "body": "" },
+        { "path": "raw-acme-boardb.md", "id": "https://boards-b.invalid/postings/acme-corp-9821", "availability": "ok", "body": "" },
+        { "path": "raw-globex-boarda.md", "id": "https://boards.invalid/postings/globex-frontend-2", "availability": "ok", "body": "" },
+        { "path": "raw-hooli-boarda.md", "id": "https://boards.invalid/postings/hooli-backend-6", "availability": "ok", "body": "" },
+        { "path": "raw-initech-boardb.md", "id": "https://boards-b.invalid/postings/initech-sre-3", "availability": "ok", "body": "" },
+        { "path": "raw-tyrell-boardb.md", "id": "https://boards-b.invalid/postings/tyrell-backend-5", "availability": "ok", "body": "" },
+        { "path": "raw-umbrella-boarda.md", "id": "https://boards.invalid/postings/umbrella-marketing-4", "availability": "ok", "body": "" },
+        { "path": "raw-wonka-boardb.md", "id": "https://boards-b.invalid/postings/wonka-swe-7", "availability": "ok", "body": "" }
+      ]
+    },
+    "expected": {
+      "paths": [
+        "manual-massive-dynamic-platform-engineer.md",
+        "raw-acme-boarda.md",
+        "raw-acme-boardb.md",
+        "raw-globex-boarda.md",
+        "raw-hooli-boarda.md",
+        "raw-initech-boardb.md",
+        "raw-tyrell-boardb.md",
+        "raw-umbrella-boarda.md",
+        "raw-wonka-boardb.md"
+      ]
+    },
+    "stability": false,
+    "runs": 1
+  },
+  {
+    "id": "enumerate-empty-dir",
+    "input": { "rawDir": "tests/synthetic/fixtures/empty-raw-dir-that-does-not-exist/" },
+    "mockResult": { "records": [] },
+    "expected": { "paths": [] },
+    "stability": false,
+    "runs": 1
+  }
+]

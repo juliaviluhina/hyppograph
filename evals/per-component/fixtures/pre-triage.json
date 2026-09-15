@@ -1,0 +1,50 @@
+[
+  {
+    "id": "pretriage-acme-boarda",
+    "input": {
+      "criteria": { "excludedLocations": ["antarctica"], "lackedClearances": ["ts/sci"], "lackedWorkAuth": [], "visaSponsorshipRequired": false },
+      "directions": [
+        { "name": "platform-backend", "description": "Backend, platform, or infrastructure engineering roles." },
+        { "name": "software-engineering", "description": "General software engineering roles including frontend, full-stack, or specialized engineering roles." }
+      ],
+      "body": "Senior Backend Engineer — Acme Inc.\n\nLocation: Berlin, Germany (Hybrid)\nSalary: EUR 70,000-90,000\n\nResponsibilities:\n- Design and build backend services for Acme's core platform.\n\nRequirements:\n- 5+ years backend engineering experience\n- Strong Node.js or Go skills"
+    },
+    "mockResult": { "decision": "kept", "reason": "platform-backend", "confidence": "normal" },
+    "expected": { "decision": "kept" },
+    "stability": true,
+    "judge": "pre-triage-reason",
+    "runs": 3
+  },
+  {
+    "id": "pretriage-initech-boardb",
+    "input": {
+      "criteria": { "excludedLocations": ["antarctica"], "lackedClearances": ["ts/sci"], "lackedWorkAuth": [], "visaSponsorshipRequired": false },
+      "directions": [
+        { "name": "platform-backend", "description": "Backend, platform, or infrastructure engineering roles." },
+        { "name": "software-engineering", "description": "General software engineering roles including frontend, full-stack, or specialized engineering roles." }
+      ],
+      "body": "Site Reliability Engineer — Initech\n\nLocation: McMurdo Station, Antarctica (on-site only — this role is not remote-eligible and is based exclusively at our Antarctic research facility)\n\nRequirements:\n- 4+ years SRE/infrastructure experience"
+    },
+    "mockResult": { "decision": "rejected", "reason": "excluded-location: posting is only located in Antarctica", "confidence": "normal" },
+    "expected": { "decision": "rejected" },
+    "stability": true,
+    "judge": "pre-triage-reason",
+    "runs": 3
+  },
+  {
+    "id": "pretriage-umbrella-boarda",
+    "input": {
+      "criteria": { "excludedLocations": ["antarctica"], "lackedClearances": ["ts/sci"], "lackedWorkAuth": [], "visaSponsorshipRequired": false },
+      "directions": [
+        { "name": "platform-backend", "description": "Backend, platform, or infrastructure engineering roles." },
+        { "name": "software-engineering", "description": "General software engineering roles including frontend, full-stack, or specialized engineering roles." }
+      ],
+      "body": "Marketing Copywriter — Umbrella Corp\n\nLocation: Berlin, Germany (on-site)\n\nResponsibilities:\n- Write product marketing copy, landing pages, and campaign emails.\n\nRequirements:\n- 3+ years copywriting experience"
+    },
+    "mockResult": { "decision": "rejected", "reason": "no direction overlap: marketing role does not match configured directions", "confidence": "normal" },
+    "expected": { "decision": "rejected" },
+    "stability": true,
+    "judge": "pre-triage-reason",
+    "runs": 3
+  }
+]

@@ -28,7 +28,8 @@ them.
 | [Why](docs/why.md) | The problem, why a fixed pipeline instead of a free-roaming agent, the constitutional principles behind every design decision |
 | [Solution design](docs/solution-design.md) | Where HyppoGraph sits relative to HyppoVisor and the data directory, the pipeline stages, model-tier policy, the data directory layout |
 | [Pipeline detail](docs/pipeline.md) | Step-by-step input/output for each live workflow (intake-normalize, fit-screen) |
-| [Testing approach](docs/testing.md) | The three test tiers (unit, isolated harness, write-fidelity), the eval harness and spend ledger |
+| [Testing approach](docs/testing.md) | The test tiers (unit, isolated harness, write-fidelity, eval harness) and how they fit together |
+| [Eval harness](docs/eval-harness.md) | Design, layers, tools, the non-Claude judge, how to run, input/output, spend ledger |
 | [How to use](docs/usage.md) | Set up HyppoVisor, point at a data directory, run the workflows, check the results |
 | [Contributing](docs/contributing.md) | Spec-driven workflow, branching/PR conventions, the Constitution Check, testing your change |
 

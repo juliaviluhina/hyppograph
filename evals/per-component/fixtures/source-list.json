@@ -1,0 +1,32 @@
+[
+  {
+    "id": "sourcelist-boarda-two-results",
+    "input": { "filteredSearch": "https://boards.invalid/search?a=1", "depth": 25 },
+    "mockResult": {
+      "opened": true,
+      "postingRefs": [
+        { "url": "https://boards.invalid/postings/acme-backend-1", "listMeta": null },
+        { "url": "https://boards.invalid/postings/globex-frontend-2", "listMeta": null }
+      ]
+    },
+    "expected": { "opened": true, "refCount": 2 },
+    "stability": false,
+    "runs": 1
+  },
+  {
+    "id": "sourcelist-zero-results",
+    "input": { "filteredSearch": "https://boards.invalid/search?empty=1", "depth": 25 },
+    "mockResult": { "opened": true, "postingRefs": [] },
+    "expected": { "opened": true, "refCount": 0 },
+    "stability": false,
+    "runs": 1
+  },
+  {
+    "id": "sourcelist-stale-search",
+    "input": { "filteredSearch": "https://boards.invalid/search?stale=1", "depth": 25 },
+    "mockResult": { "opened": false, "reason": "filtered search URL rejected by the board", "postingRefs": [] },
+    "expected": { "opened": false },
+    "stability": false,
+    "runs": 1
+  }
+]

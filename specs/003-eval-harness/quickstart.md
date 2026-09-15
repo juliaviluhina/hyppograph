@@ -47,19 +47,27 @@ green.
 ## Scenario 4 — integration gate matches the expected tree  (SC-003, US2)
 
 ```
-node evals/run.mjs integration
+node evals/run.mjs integration --substrate mock
 ```
 
-Expected: the pipeline runs over a scratch copy of `tests/synthetic/data-dir/`; every file under
-`outputs/` byte-matches `tests/synthetic/expected/`; the run performs no network access; a report
+Expected: the (canned-judgment) pipeline runs over a scratch copy of `tests/synthetic/data-dir/`;
+every file under `outputs/` (plus the root `provenance-log.md`) byte-matches
+`tests/synthetic/expected/`; the run performs no network access; a report
 `docs/eval-reports/NNNN-YYYY-MM-DD-integration.md` is written and the index gains a row.
+
+Without `--substrate mock` (the default is `workflow-tool`), the gate instead exits 2 with setup
+instructions — the `Workflow` tool's `agent()` global only exists inside a Claude Code session, so a
+plain-Node script cannot drive a real run; a human/Claude session must run the workflow over the
+scratch dir first (verified 2026-09-15 — this is by design, not a gap: `--substrate mock` is the
+automated, $0 path; `workflow-tool` is real-model authoring, done by hand).
 
 ## Scenario 5 — idempotency  (SC-003, FR-005, feature 001 SC-006)
 
 The `integration` run above automatically does a second pass over the same scratch dir.
 
-Expected: zero new files under `outputs/jobs/`, `last-run-summary.md` unchanged, `provenance-log.md`
-byte-identical to after the first pass. Reported as scope `integration-idem`.
+Expected: zero new files under `outputs/job-records/`, `last-run-summary.md` reports zero new
+activity (not necessarily byte-identical to the first pass — see `contracts/expected-tree.md`),
+`provenance-log.md` byte-identical to after the first pass. Reported as scope `integration-idem`.
 
 ## Scenario 6 — a metered command will not spend without confirmation  (SC-005, US3)
 
@@ -81,10 +89,12 @@ partial-result report.
 
 ## Scenario 8 — credential absent fails fast  (US3 scenario 3)
 
-Unset the judge credential, then run a judge-graded per-component eval:
+Unset the judge credential, then run a judge-graded per-component eval WITH spend confirmed (without
+`--confirm-spend` the run exits 0 with a cost estimate first — contracts/evals-cli.md step 2 runs
+before the credential check at step 3, so the credential path needs `--confirm-spend` to reach it):
 
 ```
-node evals/run.mjs extraction
+node evals/run.mjs extraction --confirm-spend
 ```
 
 Expected: exits 2 immediately, names the missing environment variable, never prompts, never runs a

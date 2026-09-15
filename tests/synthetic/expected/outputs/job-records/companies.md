@@ -1,0 +1,5 @@
+- Acme  <=  Acme Inc., Acme Corp
+- Globex  <=  Globex LLC
+- Hooli  <=  Hooli GmbH
+- Wonka Industries  <=  Wonka Industries
+- Massive Dynamic  <=  Massive Dynamic
