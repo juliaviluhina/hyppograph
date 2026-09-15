@@ -82,6 +82,13 @@ extraction faithfulness and pre-triage reason soundness — each against an expl
 returning pass/fail per criterion (FR-010, FR-010a). Judge calls run on an account separate from any
 metered Claude account, so they never consume the Claude eval budget.
 
+GPT Luna is served on the OpenAI *Responses* API shape (`https://opencode.ai/zen/go/v1/responses`),
+not Chat Completions — verified live 2026-09-14, `{"ok":true}` round-trip at `$0` cost. Two
+environment-only knobs beyond the credential: `HYPPO_JUDGE_EFFORT` sets the Responses API's
+`reasoning.effort` (`low` is sufficient for pass/fail rubric grading — verified live); and every call
+must carry a stable, caller-chosen `x-opencode-session` header (routing/prompt-caching, not an auth
+credential) or the endpoint 400s with `MissingSessionID`.
+
 **Rationale**: (a) cross-family judging removes the self-preference bias of a Claude judge grading
 Claude output; (b) it is already paid for and off the Anthropic meter; (c) judge and system under
 test stay independently swappable. Deterministic checks (regex / schema / keyword / byte-equality)

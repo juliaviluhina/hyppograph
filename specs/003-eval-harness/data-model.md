@@ -137,3 +137,4 @@ total reconstructable within 10% or $1 of the account's recorded spend (SC-008 /
 | Never | prompted interactively; passed as a CLI argument; written to a report, log, or the provenance log |
 | Storage | outside the repo tree (gitignored `.env`, OS keychain, or shell profile); repo carries only `.env.example` placeholder names, no values (FR-017) |
 | Used by | the judge client always; the standalone metered substrate at the FR-023 milestone only |
+| Judge non-secret config | `HYPPO_JUDGE_BASE_URL` (Responses API shape, not Chat Completions), `HYPPO_JUDGE_MODEL`, `HYPPO_JUDGE_EFFORT` (Responses `reasoning.effort`, `low` sufficient) — same environment-only sourcing as the credential, but not secrets themselves |

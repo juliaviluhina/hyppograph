@@ -29,6 +29,21 @@ committed eval evidence.
 - Q: Where should the committed eval reports and their index live? → A: A — `docs/eval-reports/`, a
   project-level directory, one file per run plus an index.
 
+### Session 2026-09-14
+
+- Q: The judge access assumption said "a non-Claude model is available" without naming it — now that
+  credentials are configured, what's the concrete choice? → A: GPT Luna (`gpt-5.6-luna`), verified
+  live with a round-trip request — confirms D5's decision (`research.md`) is not just planned but
+  reachable today.
+- Q: What reasoning effort should judge calls use for rubric pass/fail grading? → A: `low` — cheaper
+  and sufficient for the two bounded, criteria-list assertion types this feature scopes the judge to
+  (FR-010); verified live that `reasoning.effort: low` round-trips correctly.
+- Q: Judge calls 400'd with `MissingSessionID` until a session header was added — is that a credential
+  the harness must manage? → A: No — it's routing/caching metadata (a stable, caller-chosen
+  `x-opencode-session` value), not a secret. It doesn't change FR-016/FR-017 (only real credentials
+  are environment-only and repo-excluded); it's a required request property the judge client must set,
+  captured in FR-010b.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Catch a component defect without a full pipeline run (Priority: P1)
@@ -248,6 +263,11 @@ table, and a cost figure (zero for the free layer). The index gains a row.
 - **FR-010a**: Each judge-graded assertion type MUST be graded against an **explicit written criteria
   list (rubric)** stored with the eval; the judge is given the rubric and returns a pass/fail per
   criterion, not an open-ended opinion.
+- **FR-010b**: The judge client's reasoning effort MUST be an environment-configurable, non-secret
+  setting (default: the lowest effort sufficient for pass/fail rubric grading — verified `low` is
+  sufficient for the two FR-010 assertion types). Any request-routing metadata the judge endpoint
+  requires (e.g. a stable per-run session identifier) MUST be set by the client but is not a credential
+  and is exempt from FR-016/FR-017's environment-only/repo-exclusion rules.
 - **FR-011**: Every eval run MUST emit a **dated report** under `docs/eval-reports/` (one file per
   run) containing: which layer ran, methodology, the pipeline version identifier, the model
   identifiers used, a fixture identifier, a per-case pass/fail table, failure diffs where present,
@@ -346,6 +366,8 @@ table, and a cost figure (zero for the free layer). The index gains a row.
   behind (FR-021).
 - **Judge access.** A non-Claude model is available to the developer for the judge role, on an account
   separate from any metered Claude account, so judge calls do not consume the Claude eval budget.
+  Concretely, GPT Luna (`gpt-5.6-luna`) — verified live 2026-09-14 with a successful round-trip request
+  at `low` reasoning effort and `$0` cost on that probe.
 - **Default development substrate.** The model-backed layers run on the interactive Claude Code
   workflow substrate (subscription-billed) during development and while authoring the expected tree;
   no metered Claude spend occurs before the single decision point in FR-020.
