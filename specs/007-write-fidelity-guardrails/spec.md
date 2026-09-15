@@ -207,7 +207,11 @@ regression at the free, node-only tier even before US1's atomic test would.
 
 - **SC-001**: The F4 regression (dropped leading `---`) is caught by an atomic test costing one
   real model call, not a full session run — verified by deliberately reverting the BEGIN/END fix
-  and confirming the atomic test (not a session run) is what catches it.
+  and confirming the atomic test (not a session run) is what catches it. **Status (2026-09-14)**:
+  mechanism proven live (markers present → byte-exact transcription, 4/4 real-call test pass); the
+  strip-markers regression check itself did not reproduce F4 on the current model version across 4
+  live attempts — expected per this spec's own Edge Cases (a model-version-sensitive collision, not
+  a guaranteed one). See `tasks.md` T007 for the full result.
 - **SC-002**: 100% of verbatim-write call sites in `fit-screen.js` and `intake-normalize.js` are
   classified (FR-002); zero left unaudited.
 - **SC-003**: Every at-risk call site from the audit carries both the marker fix and an atomic test
