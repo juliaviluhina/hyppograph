@@ -23,12 +23,8 @@ function printDiffs(label, result) {
 }
 
 export async function runIntegrationLayer(opts = {}) {
+  // `--substrate metered` is refused centrally in evals/run.mjs before this handler ever runs.
   const substrate = opts.substrate || "workflow-tool";
-  if (substrate === "metered") {
-    console.error("integration: substrate=metered is not built yet — see the FR-023 milestone (T049).");
-    return 2;
-  }
-
   const scratch = opts.scratch || join(tmpdir(), "hyppograph-eval-integration");
   const guard = installNetworkGuard();
 

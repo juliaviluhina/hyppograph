@@ -100,12 +100,25 @@ const handlers = {
   "live-smoke": runLiveSmoke,
 };
 
+// FR-019/FR-023, contracts/evals-cli.md step 1: `--substrate metered` is refused for EVERY layer
+// until the standalone SDK substrate is built (the gated T049 milestone) — checked centrally here
+// so no individual handler can forget it (T027).
+function checkMeteredSubstrateBuilt(opts) {
+  if (opts.substrate !== "metered") return null;
+  console.error(
+    `${opts.layer}: --substrate metered is not built yet — it is the FR-023 milestone (T049), gated on explicit user credit approval. Use --substrate workflow-tool or --substrate mock.`
+  );
+  return 2;
+}
+
 export async function run(argv) {
   const opts = parseCli(argv);
   if (!opts.layer || !(opts.layer in handlers)) {
     console.error(usage());
     return 2;
   }
+  const meteredBlock = checkMeteredSubstrateBuilt(opts);
+  if (meteredBlock !== null) return meteredBlock;
   const handler = handlers[opts.layer];
   if (!handler) {
     console.error(`layer ${JSON.stringify(opts.layer)} is not wired yet`);

@@ -183,28 +183,36 @@ prints an estimate and exits 0 with no paid call; `--ceiling 0.01` aborts before
 call (exit 3, partial report); unset judge credential → exit 2 naming the var; `git grep` for
 credential patterns is clean; no `.github/workflows/` runs a non-`component` layer.
 
-- [ ] T025 [P] [US3] `evals/lib/spend.mjs` — `--confirm-spend` gate (absent + would-be-metered →
+- [X] T025 [P] [US3] `evals/lib/spend.mjs` — `--confirm-spend` gate (absent + would-be-metered →
   print `case count × blended per-call cost` estimate, exit 0, no paid call, FR-014); `--ceiling`
   with a built-in per-layer default, checked before each metered `agent()` call, abort + partial
   report if the next call would cross it (exit 3, FR-015 / research D12); estimate→measured handoff
   (SC-008).
-- [ ] T026 [P] [US3] `evals/lib/credentials.mjs` — read each required credential from the environment
+- [X] T026 [P] [US3] `evals/lib/credentials.mjs` — read each required credential from the environment
   once at start; absent → exit 2 with a message naming the variable; never prompt, never read from
   `argv` (FR-016). Used by the judge client always, by the metered substrate only at the FR-023
   milestone.
-- [ ] T027 [US3] Wire `spend.mjs` + `credentials.mjs` into `evals/run.mjs` for every metered layer;
+- [X] T027 [US3] Wire `spend.mjs` + `credentials.mjs` into `evals/run.mjs` for every metered layer;
   `--substrate metered` while the standalone substrate is unbuilt → exit 2 pointing at the FR-023
   milestone (contract: `contracts/evals-cli.md`).
-- [ ] T028 [US3] Add a guard that `evals/` never overrides the system-under-test tier — no code path
+- [X] T028 [US3] Add a guard that `evals/` never overrides the system-under-test tier — no code path
   sets a non-fast model or rewrites `HYPPO_MODEL_FAST`; assert the effective SUT model id still
   matches the fast-tier family `claude-haiku-4-5` by prefix/normalized compare (the deployed value
   carries a date suffix, e.g. `claude-haiku-4-5-20251001` in `.env.example`) — not an exact-string
   equality (FR-009).
-- [ ] T029 [US3] Confirm and document the no-unattended-metered rule — verify absence of
+- [X] T029 [US3] Confirm and document the no-unattended-metered rule — verify absence of
   `.github/workflows/`, scheduled jobs, and push hooks running any layer but `component`; document
   that only `npm test` (→ `component`) may be wired into a pre-commit hook (FR-018, Complexity
   Tracking row a).
-- [ ] T030 [US3] Run the Independent Test above; confirm SC-005, SC-006, SC-007.
+- [X] T030 [US3] Run the Independent Test above; confirm SC-005, SC-006, SC-007. Confirmed now:
+  unset judge credential names the variable (`evals/component/credentials.test.mjs`); repo/reports
+  are clean of credential material (`evals/component/credential-hygiene.test.mjs`); no unattended
+  job runs a non-`component` layer (T029). Confirmed as CENTRALIZED behaviour rather than a live
+  metered run: `--substrate metered` exits 2 for every layer today (not "prints an estimate and
+  exits 0") because the standalone substrate is unbuilt (FR-023/T049 gate) — contract step 1 takes
+  priority over the confirm-spend check by design. `--ceiling` abort-before-crossing is unit-verified
+  in `evals/component/spend.test.mjs`; no live call path exercises it yet (none exists before T033's
+  judge client or T049). Recorded as eval report `0003-…-component`.
 
 **Checkpoint**: no run can spend money without a human-typed confirmation; a leaked key has no path in.
 
