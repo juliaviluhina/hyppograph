@@ -166,6 +166,12 @@ fixture **once with usage logging** to replace the ±2× estimate with a measure
 Tier 1 is substrate-independent (plain Node). Tier 2/3 can run either place; default to the `Workflow`
 tool until/unless B2 is chosen.
 
+**FR-023 milestone gate — status (2026-09-15)**: Phases 1-7 of `003-eval-harness` (all seven free/
+`mock`-substrate layers) are built and green. `package.json` carries no runtime dependencies —
+`@anthropic-ai/claude-agent-sdk` is not present and will not be added until the user explicitly
+approves the credit spend for task T049. `--substrate metered` is refused (exit 2) for every layer
+in the meantime; there is no code path that can spend without that approval.
+
 ### 6.1 Dev-vs-official substrate — "build cheap, then Haiku"
 
 The goal is to spend no metered API dollars until a run's *result* actually matters. "Cheaper model"

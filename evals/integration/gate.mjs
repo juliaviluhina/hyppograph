@@ -101,8 +101,13 @@ export async function runGate({ scratch, substrate = "workflow-tool", skipCopy =
   if (substrate === "mock") {
     await runMockPipeline({ dataDir: scratch });
   } else if (substrate === "workflow-tool") {
-    const outputsDir = join(scratch, "outputs", "job-records");
-    if (!existsSync(outputsDir)) {
+    // last-run-summary.md is written ONLY by a completed pipeline run, never pre-seeded in the
+    // dataset — unlike outputs/job-records/ itself, which already exists in a fresh copy because
+    // the dataset's pre-seeded raw/ records live under it (found via quickstart scenario 4: that
+    // weaker check let an unrun scratch copy fall through to a doomed byte comparison instead of
+    // the setup-required message).
+    const summaryPath = join(scratch, "outputs", "last-run-summary.md");
+    if (!existsSync(summaryPath)) {
       return {
         pass: false,
         setupRequired: true,

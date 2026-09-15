@@ -306,16 +306,26 @@ matching row.
 
 ## Phase 8: Polish & Cross-Cutting Concerns
 
-- [ ] T045 [P] Verify the FR-021 move is complete — `specs/003-eval-harness/eval-strategy.md` present
+- [X] T045 [P] Verify the FR-021 move is complete — `specs/003-eval-harness/eval-strategy.md` present
   with the superseded/companion header, one-line pointer stub left at
   `specs/001-intake-normalize-pipeline/eval-strategy.md`.
-- [ ] T046 [P] Flesh out `docs/eval-reports/README.md` prose — how to read the ledger, the
+- [X] T046 [P] Flesh out `docs/eval-reports/README.md` prose — how to read the ledger, the
   expected-tree re-lock policy (FR-019), the FR-020 single spend-decision point.
-- [ ] T047 Run every `quickstart.md` scenario (1–12) end to end; fix any gap; capture the run as an
-  eval report.
-- [ ] T048 [P] Record the FR-023 milestone gate in `specs/003-eval-harness/` notes — all free layers
+- [X] T047 Run every `quickstart.md` scenario (1–12) end to end; fix any gap; capture the run as an
+  eval report. Ran 1-11 live; 12 (live-smoke against a real board) is genuinely manual and was not
+  run — no live/metered spend has occurred in this feature. Found and fixed a real gate bug:
+  `gate.mjs`'s workflow-tool setup-required check tested for `outputs/job-records/` existing, but
+  that directory is already present in a freshly-copied scratch dir (the dataset's own pre-seeded
+  `raw/` lives under it) — so an unrun scratch copy fell through to a doomed byte comparison instead
+  of the setup-required message. Fixed to check for `outputs/last-run-summary.md`, which only a
+  completed run ever writes. Also corrected quickstart.md's stale `outputs/jobs/` wording and
+  scenario 8's example command (needs `--confirm-spend` to reach the credential check at all, per
+  contracts/evals-cli.md's step order). Recorded as eval report `0010-…-integration` (mock substrate,
+  now green) plus this note for the gate-bug finding.
+- [X] T048 [P] Record the FR-023 milestone gate in `specs/003-eval-harness/` notes — all free layers
   green first; `@anthropic-ai/claude-agent-sdk` stays out of `package.json` until the user approves
-  the credit spend.
+  the credit spend. Added a "status" note to `eval-strategy.md` §6 confirming Phases 1-7 are green
+  and `package.json` carries no SDK dependency yet.
 - [ ] T049 **[GATED — requires explicit user credit approval, FR-020/FR-023]** Build the standalone
   metered substrate: add `@anthropic-ai/claude-agent-sdk` to `devDependencies`, implement
   `--substrate metered` in `evals/run.mjs`, re-lock `tests/synthetic/expected/` for the substrate
