@@ -56,6 +56,36 @@ report in [`docs/eval-reports/`](./eval-reports/README.md), so cost stays audita
 against the account's actual recorded spend. No run is triggered automatically — no
 CI, no push/PR hooks; every metered run is started by hand.
 
+## Q&A: models and credentials
+
+**What model runs `npm run harness`?** No model at all for node-only cases (pure
+loopback HTTP + assertions). Model-backed cases need to be driven inside a Claude
+Code session, and then use whatever model the live workflow itself declares — `haiku`
+for every step except `hyppo-score`, which is `sonnet`
+([Solution design → Model usage](./solution-design.md#model-usage)).
+
+**What model runs `npm run test:fidelity`, and via what credentials?** Each test
+shells out to `claude -p` (`tests/fidelity/support/run-workflow.mjs`), which drives a
+real `Workflow`/`agent()` call in a throwaway Claude Code session. The model is
+hardcoded to `haiku` in each `*.workflow.js` file (e.g.
+`tests/fidelity/write-evaluation.workflow.js:100`). Credentials are whatever the
+`claude` CLI on your machine is already authenticated with — the same login your
+interactive session uses, subscription-billed, **not** an API key from `.env`. The
+subprocess runs with `--dangerously-skip-permissions` so it can write its temp output
+file non-interactively; that's a permissions bypass, not a separate credential.
+
+**Gotcha:** running `npm run test:fidelity` from *inside* an agent session (rather
+than your own terminal) trips a classifier that blocks spawning
+`claude -p --dangerously-skip-permissions` outright ("Create Unsafe Agents") — the
+child process exits 0 but stdout is just the denial message, so no real model call
+happens. Run this suite directly from your terminal.
+
+**Where do `HYPPO_JUDGE_API_KEY` / `HYPPO_JUDGE_BASE_URL` / `HYPPO_JUDGE_MODEL` fit
+in?** They're placeholder names in `.env.example` for feature 003's non-Claude judge
+model (used for judge-graded per-component eval cases). `evals/` is currently empty
+directory scaffolding — no runner code reads those vars yet, so they're a reserved
+spot for unbuilt work, not something a working setup is missing.
+
 ## Manual validation
 
 Both live workflows still carry a manual **quickstart**: hand-run scenarios against
