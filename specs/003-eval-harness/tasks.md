@@ -332,6 +332,22 @@ matching row.
   move (logged in a report's *Findings*), do the first metered `integration` run, and replace the
   cost estimate with the measured figure (SC-008). **Do not start without the user's go-ahead.**
 
+  Addendum (2026-09-15, reasoning — why this layer on top of what's already free and green):
+  Tiers 1-3 on the `mock`/`workflow-tool` substrates already prove *correctness* — plumbing at $0
+  (mock), real-Haiku judgment quality at ~$0-to-the-user (workflow-tool, subscription-billed). This
+  task adds nothing on that axis. What it adds instead: (1) **reproducibility outside a Claude Code
+  session** — the `Workflow` tool only runs inside an interactive session; the standalone Agent SDK
+  harness is a plain Node script + API key, runnable by anyone without a Claude Code login;
+  (2) **harness drift, not model drift** — same Haiku weights, but the `Workflow` tool wraps calls
+  in Claude Code's own system prompt and `.claude/agents/*.md` defs, while the standalone SDK
+  reconstructs its own agent config, so a metered run validates that judgment quality holds under a
+  *different* prompt-wrapping, not just inside Claude Code; (3) **portfolio value** — a working
+  Agent-SDK-based harness (auth, spend controls, a real measured cost) demonstrates production-shaped
+  eval infra, per `eval-strategy.md` §6's own framing: "Justified only if the portfolio evidence is
+  worth ~$10-20 of metered spend." Explicitly Phase B / optional (`eval-strategy.md` §6, option B2)
+  — not a Phase A correctness requirement; everything needed to call 003 done for validating feature
+  001 is already green and free.
+
   Addendum (2026-09-15, pre-start reflection): researched and confirmed the Claude Pro/Max
   subscription and the Anthropic API/Console are separate products with independent billing —
   subscription usage cannot be spent against the API under any plan, and a subscription lapsing
