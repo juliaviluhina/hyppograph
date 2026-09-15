@@ -64,7 +64,9 @@ requirement, and pulls in a whole fixture tree to test one file write.
 
 **Decision**: Three atomic tests total (FR-001's audit #1, FR-003's audit #2 and #3), each one real
 fast-tier (`hyppo-readwrite`, Haiku-class) `agent()` call. No parallel fan-out needed at this scale;
-run serially.
+run serially — enforced via `node --test --test-concurrency=1` in `npm run test:fidelity`
+(`package.json`), since Node's test runner otherwise runs test files concurrently by default and a
+live run (2026-09-14) showed simultaneous nested `claude -p` sessions can collide.
 
 **Rationale**: Matches 003-eval-harness's Tier 2 cost posture (cents, not dollars) and the spec's
 own Edge Cases note to "keep the atomic suite's total call count small and deliberate."

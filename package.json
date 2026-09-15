@@ -7,6 +7,6 @@
     "test": "node --test evals/component/",
     "eval": "node evals/run.mjs",
     "harness": "node tests/harness/run.mjs",
-    "test:fidelity": "node --test tests/fidelity/"
+    "test:fidelity": "node --test --test-concurrency=1 tests/fidelity/"
   }
 }

@@ -18,14 +18,12 @@ const frontMatter = ["---", 'jobRecordKey: "acme"', 'overallVerdict: "APPLY"', "
 const body = ["", "## Requirement table", "", "(synthetic fidelity-test fixture)", ""].join("\n");
 const content = frontMatter + body;
 
-const prompt = [
-  `Write the EXACT content between the BEGIN-CONTENT and END-CONTENT markers below (excluding the`,
-  `marker lines themselves — they are not part of the file) to (overwrite if it already exists): ${args.outputPath}`,
-  "",
-  "BEGIN-CONTENT",
-  content,
-  "END-CONTENT",
-].join("\n");
+// TEMPORARY — SC-001 regression check (T007): pre-fix flat shape, no BEGIN/END markers.
+// Revert with `git checkout -- tests/fidelity/write-evaluation.workflow.js` after confirming
+// this makes the test fail with the leading "---" dropped.
+const prompt = [`Write this exact text to ${args.outputPath} (overwrite if it already exists):`, "", content].join(
+  "\n"
+);
 
 await agent(prompt, {
   schema: { type: "object", properties: { written: { type: "boolean" } }, required: ["written"] },
