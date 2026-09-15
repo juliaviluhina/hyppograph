@@ -7,6 +7,54 @@ tier, but the only instrument available at the time was a full ~25-minute,
 ~89-`agent()`-call workflow run. Full reasoning and bug history:
 [`specs/003-eval-harness/eval-strategy.md`](../specs/003-eval-harness/eval-strategy.md).
 
+## Layers, top to bottom: cheapest/most-frequent → priciest/rarest
+
+Solid boxes are live today; dashed boxes are specced but not built yet — see each
+layer's section below for status and the spec that owns it.
+
+```mermaid
+flowchart TD
+  classDef live fill:#e8f5e9,stroke:#2e7d32,color:#1b5e20;
+  classDef planned fill:#fff3e0,stroke:#e65100,stroke-dasharray:5 5,color:#5d3a00;
+
+  A["Pure-code unit tests
+WHAT: dedup keys, slugs, fingerprints, summary rendering
+WHY: catch pure-logic bugs in seconds, not a 25-min run
+HOW: node:test on .claude/workflows/lib/ — npm test, $0"]:::live
+
+  B["Isolated test harness (005)
+WHAT: full verify→score flow vs a loopback ATS stand-in
+WHY: catch wiring/integration bugs, zero live network
+HOW: npm run harness — $0, session needed for model-backed cases"]:::live
+
+  C["Atomic write-fidelity tests (007)
+WHAT: verbatim-write prompts, asserted byte-exact
+WHY: guard against paraphrasing/reformatting drift by the model
+HOW: npm run test:fidelity — real haiku calls, cents per run"]:::live
+
+  D["Manual quickstart
+WHAT: hand-run scenarios against tests/fixtures/data-dir/
+WHY: Phase A validation floor until automation lands
+HOW: each spec's quickstart.md, run and checked by hand"]:::live
+
+  E["Per-component eval harness (003)
+WHAT: judge-graded judgment quality — extraction faithfulness,
+triage-reason correctness, stability across reruns
+WHY: measure judgment quality, not just wiring/plumbing
+HOW: evals/run.mjs + non-Claude judge model — SCAFFOLDED ONLY,
+evals/ dirs exist but no runner code yet"]:::planned
+
+  F["Automated vitest + CI, statistical SC measurement (Phase B)
+WHAT: full automated coverage, hard idempotency guarantees,
+SC-006/SC-008-class statistical measurement against a labelled set
+WHY: replace manual quickstart as the release-confidence gate
+HOW: vitest suite — gated on each feature's Phase A exit review;
+metered runs stay user-triggered by hand, never CI-triggered"]:::planned
+
+  A --> B --> C --> D -.-> E
+  D -.-> F
+```
+
 | Tier | What it covers | Cost | Command |
 |---|---|---|---|
 | Pure-code unit tests | Dedup keys, slugging, fingerprints, summary rendering — every helper factored out of the workflows into `.claude/workflows/lib/` | $0, milliseconds | `npm test` |
