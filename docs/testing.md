@@ -15,41 +15,55 @@ layer's section below for status and the spec that owns it.
 ```mermaid
 flowchart TD
   classDef live fill:#e8f5e9,stroke:#2e7d32,color:#1b5e20;
-  classDef planned fill:#fff3e0,stroke:#e65100,stroke-dasharray:5 5,color:#5d3a00;
+  classDef planned fill:#fff3e0,stroke:#e65100,stroke-dasharray:3 3,color:#5d3a00;
 
-  A["Pure-code unit tests
-WHAT: dedup keys, slugs, fingerprints, summary rendering
-WHY: catch pure-logic bugs in seconds, not a 25-min run
-HOW: node:test on .claude/workflows/lib/ — npm test, $0"]:::live
+  subgraph A["① Pure-code unit tests"]
+    direction TB
+    A_what["WHAT<br/>dedup keys, slugs, fingerprints, summary rendering"]:::live
+    A_why["WHY<br/>catch pure-logic bugs in seconds, not a 25-min run"]:::live
+    A_how["HOW<br/>node:test on .claude/workflows/lib/ — npm test, $0"]:::live
+    A_what --> A_why --> A_how
+  end
 
-  B["Isolated test harness (005)
-WHAT: full verify→score flow vs a loopback ATS stand-in
-WHY: catch wiring/integration bugs, zero live network
-HOW: npm run harness — $0, session needed for model-backed cases"]:::live
+  subgraph B["② Isolated test harness (005)"]
+    direction TB
+    B_what["WHAT<br/>full verify→score flow vs a loopback ATS stand-in"]:::live
+    B_why["WHY<br/>catch wiring/integration bugs, zero live network"]:::live
+    B_how["HOW<br/>npm run harness — $0, session needed for model-backed cases"]:::live
+    B_what --> B_why --> B_how
+  end
 
-  C["Atomic write-fidelity tests (007)
-WHAT: verbatim-write prompts, asserted byte-exact
-WHY: guard against paraphrasing/reformatting drift by the model
-HOW: npm run test:fidelity — real haiku calls, cents per run"]:::live
+  subgraph C["③ Atomic write-fidelity tests (007)"]
+    direction TB
+    C_what["WHAT<br/>verbatim-write prompts, asserted byte-exact"]:::live
+    C_why["WHY<br/>guard against paraphrasing/reformatting drift by the model"]:::live
+    C_how["HOW<br/>npm run test:fidelity — real haiku calls, cents per run"]:::live
+    C_what --> C_why --> C_how
+  end
 
-  D["Manual quickstart
-WHAT: hand-run scenarios against tests/fixtures/data-dir/
-WHY: Phase A validation floor until automation lands
-HOW: each spec's quickstart.md, run and checked by hand"]:::live
+  subgraph D["④ Manual quickstart"]
+    direction TB
+    D_what["WHAT<br/>hand-run scenarios against tests/fixtures/data-dir/"]:::live
+    D_why["WHY<br/>Phase A validation floor until automation lands"]:::live
+    D_how["HOW<br/>each spec's quickstart.md, run and checked by hand"]:::live
+    D_what --> D_why --> D_how
+  end
 
-  E["Per-component eval harness (003)
-WHAT: judge-graded judgment quality — extraction faithfulness,
-triage-reason correctness, stability across reruns
-WHY: measure judgment quality, not just wiring/plumbing
-HOW: evals/run.mjs + non-Claude judge model — SCAFFOLDED ONLY,
-evals/ dirs exist but no runner code yet"]:::planned
+  subgraph E["⑤ Per-component eval harness (003) — PLANNED"]
+    direction TB
+    E_what["WHAT<br/>judge-graded judgment quality — extraction faithfulness,<br/>triage-reason correctness, stability across reruns"]:::planned
+    E_why["WHY<br/>measure judgment quality, not just wiring/plumbing"]:::planned
+    E_how["HOW<br/>evals/run.mjs + non-Claude judge model — SCAFFOLDED ONLY,<br/>evals/ dirs exist but no runner code yet"]:::planned
+    E_what --> E_why --> E_how
+  end
 
-  F["Automated vitest + CI, statistical SC measurement (Phase B)
-WHAT: full automated coverage, hard idempotency guarantees,
-SC-006/SC-008-class statistical measurement against a labelled set
-WHY: replace manual quickstart as the release-confidence gate
-HOW: vitest suite — gated on each feature's Phase A exit review;
-metered runs stay user-triggered by hand, never CI-triggered"]:::planned
+  subgraph F["⑥ Automated vitest + CI, statistical SC measurement (Phase B) — PLANNED"]
+    direction TB
+    F_what["WHAT<br/>full automated coverage, hard idempotency guarantees,<br/>SC-006/SC-008-class statistical measurement against a labelled set"]:::planned
+    F_why["WHY<br/>replace manual quickstart as the release-confidence gate"]:::planned
+    F_how["HOW<br/>vitest suite — gated on each feature's Phase A exit review;<br/>metered runs stay user-triggered by hand, never CI-triggered"]:::planned
+    F_what --> F_why --> F_how
+  end
 
   A --> B --> C --> D -.-> E
   D -.-> F
