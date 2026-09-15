@@ -1,0 +1,54 @@
+[
+  {
+    "id": "extraction-globex-frontend",
+    "input": {
+      "body": "Frontend Engineer — Globex LLC\n\nLocation: Remote (EU)\nEmployment type: Full-time\n\nGlobex LLC is building a new customer-facing web application and needs a Frontend Engineer to help ship it.\n\nResponsibilities:\n- Build and maintain customer-facing web applications.\n- Collaborate with design on UI implementation.\n- Improve front-end performance and accessibility.\n\nRequirements:\n- 3+ years frontend experience\n- React proficiency\n- Familiarity with TypeScript\n\n(Salary not disclosed in this posting.)"
+    },
+    "mockResult": {
+      "roleTitle": "Frontend Engineer",
+      "normalizedTitle": "frontend engineer",
+      "companyAsStated": "Globex LLC",
+      "locations": ["Remote (EU)"],
+      "locationBucket": "remote-eu",
+      "workArrangement": "remote",
+      "salaryAmountOrRange": "unknown",
+      "salaryCurrency": "unknown",
+      "seniority": "unknown",
+      "employmentType": "full-time",
+      "postingDate": "unknown",
+      "originalLanguage": "en",
+      "responsibilitiesSummary": "Build and maintain customer-facing web applications, collaborate with design on UI implementation, and improve front-end performance and accessibility.",
+      "requirements": ["3+ years frontend experience", "React proficiency", "Familiarity with TypeScript"]
+    },
+    "expected": { "locationBucket": "remote-eu", "salaryAmountOrRange": "unknown" },
+    "stability": true,
+    "judge": "extraction-faithfulness",
+    "runs": 3
+  },
+  {
+    "id": "extraction-hooli-nonenglish",
+    "input": {
+      "body": "Backend-Entwickler — Hooli GmbH\n\nStandort: Berlin (vor Ort)\nAnstellungsart: Vollzeit\nGehalt: 65.000 EUR - 80.000 EUR pro Jahr\n\nHooli GmbH sucht einen Backend-Entwickler zur Entwicklung und Wartung unserer internen Tools.\n\nAufgaben:\n- Entwicklung und Wartung von Backend-Diensten für interne Tools.\n\nAnforderungen:\n- 3+ Jahre Erfahrung in der Backend-Entwicklung\n- Kenntnisse in Java oder Kotlin"
+    },
+    "mockResult": {
+      "roleTitle": "Backend Developer",
+      "normalizedTitle": "backend developer",
+      "companyAsStated": "Hooli GmbH",
+      "locations": ["Berlin"],
+      "locationBucket": "berlin",
+      "workArrangement": "on-site",
+      "salaryAmountOrRange": "€65,000–€80,000",
+      "salaryCurrency": "EUR",
+      "seniority": "unknown",
+      "employmentType": "full-time",
+      "postingDate": "unknown",
+      "originalLanguage": "de",
+      "responsibilitiesSummary": "Develop and maintain backend services for Hooli's internal tools.",
+      "requirements": ["3+ years backend development experience", "Java or Kotlin proficiency"]
+    },
+    "expected": { "locationBucket": "berlin", "originalLanguage": "de" },
+    "stability": true,
+    "judge": "extraction-faithfulness",
+    "runs": 3
+  }
+]

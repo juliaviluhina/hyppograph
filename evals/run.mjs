@@ -8,6 +8,7 @@ import { parseArgs } from "node:util";
 import { spawnSync } from "node:child_process";
 import { isAbsolute, resolve } from "node:path";
 import { runIntegrationLayer } from "./integration/run-layer.mjs";
+import { makePerComponentHandler } from "./per-component/run-layer.mjs";
 
 const LAYERS = [
   "component",
@@ -92,10 +93,10 @@ function runLiveSmoke(opts) {
 // Dispatch table — one entry per contract layer token. `null` = not wired yet.
 const handlers = {
   component: runComponent,
-  enumerate: null,
-  "pre-triage": null,
-  extraction: null,
-  "source-list": null,
+  enumerate: makePerComponentHandler("enumerate"),
+  "pre-triage": makePerComponentHandler("pre-triage"),
+  extraction: makePerComponentHandler("extraction"),
+  "source-list": makePerComponentHandler("source-list"),
   integration: runIntegrationLayer,
   "live-smoke": runLiveSmoke,
 };

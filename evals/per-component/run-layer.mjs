@@ -1,0 +1,63 @@
+// evals/per-component/run-layer.mjs — wires the four per-component layers into evals/run.mjs.
+// A layer whose fixtures use a judge (pre-triage, extraction) is treated as incurring cost — the
+// judge is a real (if currently ~$0) external API call — so it goes through the same
+// --confirm-spend gate as any metered layer (FR-014); enumerate/source-list have no judge cases and
+// so are always free.
+
+import { checkConfirmSpend } from "../lib/spend.mjs";
+import { requireJudgeCredential, missingCredentialMessage } from "../lib/credentials.mjs";
+import { loadFixtures } from "./lib/run-subtask.mjs";
+import { runEnumerate } from "./enumerate.mjs";
+import { runPreTriage } from "./pre-triage.mjs";
+import { runExtraction } from "./extraction.mjs";
+import { runSourceList } from "./source-list.mjs";
+
+const RUNNERS = {
+  enumerate: { run: runEnumerate, fixturesPath: "evals/per-component/fixtures/enumerate.json" },
+  "pre-triage": { run: runPreTriage, fixturesPath: "evals/per-component/fixtures/pre-triage.json" },
+  extraction: { run: runExtraction, fixturesPath: "evals/per-component/fixtures/extraction.json" },
+  "source-list": { run: runSourceList, fixturesPath: "evals/per-component/fixtures/source-list.json" },
+};
+
+function printCases(layer, result) {
+  for (const c of result.cases || []) {
+    const mark = c.pass ? "PASS" : "FAIL";
+    console.log(`${layer}: [${mark}] ${c.id}`);
+    if (!c.determCheck.pass) console.log(`  deterministic check: ${c.determCheck.message}`);
+    if (!c.stable) console.log(`  stability: output differed across runs`);
+    if (c.judgeResult && c.judgeResult.verdict !== "pass") {
+      console.log(`  judge: ${c.judgeResult.verdict}${c.judgeResult.note ? ` — ${c.judgeResult.note}` : ""}`);
+      for (const r of c.judgeResult.results || []) {
+        if (r.verdict === "fail") console.log(`    fail: ${r.criterion} — ${r.note || ""}`);
+      }
+    }
+  }
+}
+
+export function makePerComponentHandler(layer) {
+  return async function handler(opts) {
+    const { run, fixturesPath } = RUNNERS[layer];
+    const fixtures = loadFixtures(fixturesPath);
+    const wouldBeMetered = fixtures.some((fx) => fx.judge);
+
+    const confirm = checkConfirmSpend({ layer, wouldBeMetered, confirmSpend: opts.confirmSpend, caseCount: fixtures.length });
+    if (!confirm.proceed) return confirm.exitCode;
+
+    if (wouldBeMetered) {
+      const cred = requireJudgeCredential();
+      if (!cred.ok) {
+        console.error(`${layer}: ${missingCredentialMessage(cred.missing)}`);
+        return 2;
+      }
+    }
+
+    const result = await run({ substrate: opts.substrate || "workflow-tool" });
+    if (result.setupRequired) {
+      console.error(result.message);
+      return 2;
+    }
+    printCases(layer, result);
+    console.log(`${layer}: ${result.pass ? "PASSED" : "FAILED"} (${result.cases.filter((c) => c.pass).length}/${result.cases.length})`);
+    return result.pass ? 0 : 1;
+  };
+}

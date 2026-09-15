@@ -228,34 +228,39 @@ N-run stability for values feeding deterministic keys.
 set and fails clearly if the subtask cannot enumerate; run `extraction.mjs`'s location-bucket case
 N times → value stays in vocabulary and is identical across runs.
 
-- [ ] T031 [P] [US4] `evals/per-component/fixtures/{enumerate,pre-triage,extraction,source-list}.json`
+- [X] T031 [P] [US4] `evals/per-component/fixtures/{enumerate,pre-triage,extraction,source-list}.json`
   — per-subtask tables: `id`, `input`, deterministic `expected`, `stability`, optional `judge`,
   `runs` (default 3) (data-model "Per-component fixture table").
-- [ ] T032 [P] [US4] `evals/per-component/rubrics/extraction-faithfulness.md` and
+- [X] T032 [P] [US4] `evals/per-component/rubrics/extraction-faithfulness.md` and
   `pre-triage-reason.md` — `## criteria` (concrete self-contained pass/fail checks) + `## pass_rule`
   (default "all"); no other rubric `type` is permitted (FR-010a, contract: `contracts/judge-rubric.md`).
-- [ ] T033 [P] [US4] `evals/lib/judge.mjs` — non-Claude judge client: POST to
+- [X] T033 [P] [US4] `evals/lib/judge.mjs` — non-Claude judge client: POST to
   `HYPPO_JUDGE_BASE_URL` (Responses API shape) with `HYPPO_JUDGE_MODEL`,
   `reasoning.effort: HYPPO_JUDGE_EFFORT`, and a stable `x-opencode-session` header (else the
   endpoint 400s `MissingSessionID` — verified live 2026-09-14); build
   `{ criteria, source_posting, produced_output }`, credential as transport header only (never in
   payload, never logged), parse `{ results: [{ criterion, verdict, note }] }`, malformed/missing
   criterion → case fails "judge response malformed" (FR-010, FR-012).
-- [ ] T034 [US4] `evals/per-component/enumerate.mjs` — run `hyppo-read` over a synthetic `raw/` dir,
+- [X] T034 [US4] `evals/per-component/enumerate.mjs` — run `hyppo-read` over a synthetic `raw/` dir,
   assert the exact expected record set; fail clearly when the subtask lacks the enumeration
   capability (US4 scenario 1; covers the "stage silently zeroed" defect, SC-002).
-- [ ] T035 [US4] `evals/per-component/pre-triage.mjs` — assert keep/reject + reason bucket
+- [X] T035 [US4] `evals/per-component/pre-triage.mjs` — assert keep/reject + reason bucket
   (deterministic) and N-run stability; judge grades reason soundness against `pre-triage-reason`.
-- [ ] T036 [US4] `evals/per-component/extraction.mjs` — assert extracted fields and that the coarse
+- [X] T036 [US4] `evals/per-component/extraction.mjs` — assert extracted fields and that the coarse
   location bucket stays in its fixed vocabulary and is identical across N runs (FR-008); judge grades
   extraction faithfulness.
-- [ ] T037 [US4] `evals/per-component/source-list.mjs` — assert source-list parsing from a saved
+- [X] T037 [US4] `evals/per-component/source-list.mjs` — assert source-list parsing from a saved
   fixture (deterministic).
-- [ ] T038 [US4] Wire `enumerate | pre-triage | extraction | source-list` layers into
+- [X] T038 [US4] Wire `enumerate | pre-triage | extraction | source-list` layers into
   `evals/run.mjs`; each imports its prompt from `.claude/workflows/lib/prompts.mjs` — never a copy
   (FR-007); default substrate `workflow-tool`, `mock` supported for plumbing.
-- [ ] T039 [US4] Run the Independent Test above; confirm the enumeration-capability removal is caught
-  and the location bucket is stable across runs (SC-002).
+- [X] T039 [US4] Run the Independent Test above; confirm the enumeration-capability removal is caught
+  and the location bucket is stable across runs (SC-002). Confirmed live: zeroing the enumerate
+  fixture's canned record set fails the case and names the exact missing paths; restoring returns to
+  green. Location-bucket N-run stability (extraction fixtures, `stability: true`, `runs: 3`) passed —
+  trivially deterministic on the mock substrate, real run-to-run wobble is only observable at the
+  `workflow-tool` substrate (not yet exercised — no live/metered run has occurred in this feature).
+  Recorded as eval report `0004-…-eval-per-component`.
 
 **Checkpoint**: a one-subtask eval finds a missing capability or a wobbly key-feeding value in seconds.
 
