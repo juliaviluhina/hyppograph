@@ -202,6 +202,12 @@ order, instead of not doing it at all.
 - Batch `appendProvenance` into one write per phase instead of one agent call per record —
   directly removes both the race justification for seriality *and* most of the per-record wall-clock
   cost (each call was independently costing ~40-55s in the timed run, purely for a one-line append).
+  **DONE, 2026-09-20.** `intake-normalize.js` now queues every provenance line in memory
+  (`queueProvenance`) and flushes each phase's queue in one agent() call (`flushProvenance`) instead
+  of one call per record. Verified live alongside the 006 fix: a two-pass run against the 14-record
+  test fixture showed zero provenance calls in a phase whose queue stayed empty (triage, on the
+  idempotent second pass) and exactly one batched call for normalize's 7 merges (vs. 7 separate calls
+  previously). See issue 006's Status section for the full verification writeup.
 
 **Needs verification before building:**
 - Confirm empirically whether concurrent per-record `hyppo-judge` (triage) and normalize

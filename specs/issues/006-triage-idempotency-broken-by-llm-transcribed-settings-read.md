@@ -1,8 +1,22 @@
 # Issue: `intake-normalize.js`'s triage idempotency guard is broken by a non-deterministic settings read
 
-**Status:** Confirmed live, 2026-09-20 — caused a real run to redo triage on all 35 raw records
-instead of the 15 actually-new ones, and the run was stopped early specifically because of the
-wasted cost. Not yet spec'd.
+**Status:** FIXED and verified live, 2026-09-20. Root cause confirmed live the same day — a real run
+redid triage on all 35 raw records instead of the 15 actually-new ones, and the run was stopped
+early specifically because of the wasted cost. Fix applied per the "Fix" section below (raw-text
+settings read + code-side JSON.parse, mirroring fit-screen.js exactly) and verified by running
+`intake-normalize.js` twice, back to back, against a scratch copy of `tests/fixtures/data-dir`
+(14 raw records, unchanged `settings.json` between runs):
+- **Run 1** (fresh, from-scratch triage): `triageKept: 12, triageRejected: 3`, all 14 records got a
+  real `triage:`/`write-triage:` agent call and a stored `criteriaHash`.
+- **Run 2** (same dataDir, same settings, no config change): **zero** `triage:*` / `write-triage:*`
+  agent calls appear anywhere in the run's journal — every record hit the `criteriaHash` skip branch
+  and `continue`d. `summary.triageKept`/`triageRejected` came back unchanged (12/3), carried over
+  from the stored marks, not recomputed. Also confirms issue 005 §1's batched-provenance fix
+  (`queueProvenance`/`flushProvenance`): the triage phase's provenance queue stayed empty (zero
+  provenance agent calls for phase `triage` in run 2, vs. one per record in run 1), and normalize's
+  7 merges flushed as a single batched write instead of 7 separate ones.
+
+No spec was needed — bug-fix-sized, direct port of an already-proven fix in the same repo.
 
 **Scope:** `.claude/workflows/intake-normalize.js`'s `read-settings` step (`settingsReadSchema`,
 line 77) and `criteriaFingerprint` (line 954), which together back the triage-skip check (FR-008,
