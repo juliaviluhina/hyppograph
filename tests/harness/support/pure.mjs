@@ -80,6 +80,66 @@ export function computeInputFingerprint({ rec, evidenceFiles, applications, hard
   return fnv1aHex(parts.join("\n---\n"));
 }
 
+// issue 004 remediation — mirrored verbatim from .claude/workflows/fit-screen.js.
+export function parseSalaryRange(text) {
+  if (!text) return null;
+  const trimmed = String(text).trim();
+  if (trimmed === "" || trimmed.toLowerCase() === "unknown") return null;
+  if (/\b(hourly|hour|\/\s*hr)\b/i.test(trimmed)) return { hourly: true };
+  const numbers = [];
+  const numRe = /(\d[\d,]*(?:\.\d+)?)\s*(k\b)?/gi;
+  let m;
+  while ((m = numRe.exec(trimmed)) !== null) {
+    let n = parseFloat(m[1].replace(/,/g, ""));
+    if (Number.isNaN(n)) continue;
+    if (m[2]) n *= 1000; // "k" suffix, e.g. "90k-120k"
+    numbers.push(n);
+  }
+  if (numbers.length === 0) return null;
+  if (numbers.length === 1) return { low: numbers[0], high: numbers[0] };
+  return { low: numbers[0], high: numbers[1] };
+}
+
+export function evaluateCompFloor(salaryAmountOrRange, salaryCurrency, compFloor) {
+  if (!compFloor) return { constraint: "compFloor", state: "pass", likelyOutcome: null, note: null };
+
+  if (salaryCurrency && salaryCurrency.toLowerCase() !== "unknown" && salaryCurrency !== compFloor.currency) {
+    return {
+      constraint: "compFloor",
+      state: "unresolved",
+      likelyOutcome: "even",
+      note: `posting currency ${salaryCurrency} differs from configured floor currency ${compFloor.currency}; no conversion performed`,
+    };
+  }
+
+  const parsed = parseSalaryRange(salaryAmountOrRange);
+  if (!parsed) {
+    return {
+      constraint: "compFloor",
+      state: "unresolved",
+      likelyOutcome: "even",
+      note: "posting's salary text did not resolve to a comparable annual figure",
+    };
+  }
+  if (parsed.hourly) {
+    return {
+      constraint: "compFloor",
+      state: "unresolved",
+      likelyOutcome: "even",
+      note: "posting states an hourly rate; no hourly comp floor is configured to compare against",
+    };
+  }
+
+  const midpoint = (parsed.low + parsed.high) / 2;
+  const pass = midpoint >= compFloor.amount;
+  return {
+    constraint: "compFloor",
+    state: pass ? "pass" : "fail",
+    likelyOutcome: null,
+    note: `midpoint ${midpoint} ${pass ? ">=" : "<"} floor ${compFloor.amount}`,
+  };
+}
+
 export function computeOverallVerdict(requirementTable, hardConstraints) {
   const RANK = { SKIP: 0, "APPLY-AND-SEE": 1, APPLY: 2 };
 

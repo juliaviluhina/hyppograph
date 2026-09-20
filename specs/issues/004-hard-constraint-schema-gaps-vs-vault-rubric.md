@@ -80,3 +80,23 @@ no spec needed, they're bug-fix-sized. Take the `unresolved` outcome through
 `speckit-specify`/`plan` given it changes `hyppo-score`'s contract and the Constitution Check.
 The two new schema fields + judgment calls (travel, relocation market) can ride the same spec or
 follow after. Docs-only template fix can land independently, anytime.
+
+## Status (2026-09-19)
+
+**Compensation-floor midpoint logic — DONE**, direct fix, no spec:
+`evaluateCompFloor`/`parseSalaryRange` added to `.claude/workflows/fit-screen.js`, mirrored in
+`tests/harness/support/pure.mjs` per the project's pure-helper convention, with unit tests in
+`tests/harness/pure.test.mjs`. `compFloor` is now a code-computed hard-constraint row (parses
+`salaryAmountOrRange`, applies the midpoint-clears-a-low-floor rule already documented in
+`data-model.md`, currency-mismatch and unparseable/hourly text all resolve to `unresolved`
+rather than an assumed pass); `hyppo-score` is explicitly told to omit it from its own
+`hardConstraints` array.
+
+**Work-model precedence — NOT actionable as scoped, deferred.** Checked the current schema:
+there is no `workModel` field, no board `isRemote` flag, and no such data anywhere in the Job
+Record shape produced by `intake-normalize.js` — only free-text `locations`. The fix as written
+("when a posting-page-derived work model disagrees with a board's `isRemote` flag, prefer the
+posting-page value") has no data source to reconcile yet, so it isn't a same-day code fix; it
+needs new Job Record fields first. Folding this into the schema-additions category above instead
+— it should ride the same `speckit-specify`/`plan` pass as the other new fields (travel,
+relocation market), not land as an isolated bug fix.
