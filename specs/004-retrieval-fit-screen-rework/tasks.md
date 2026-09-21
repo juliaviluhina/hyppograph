@@ -323,14 +323,23 @@ log use exactly the vocabulary name in every case.
 - [X] T043 [US4] Populate `RunSummary.namedOutcomeCounts`; review every non-clean code path in the
       script and confirm each sets one of exactly these four values (plus feature 001's existing
       vocabulary for anything upstream) — no ad hoc string ever reaches the summary or provenance log
-- [ ] T044 [US4] Manual validation: force each of the four outcomes against fixtures (delete an
+- [X] T044 [US4] Manual validation: force each of the four outcomes against fixtures (delete an
       evidence file, truncate a Job Record's requirements, remove `recencyWindowYears`, engineer a
       conflicting tracker match); verify quickstart scenario 8 by hand — grep the run summary and
       `provenance-log.md` for any outcome text outside `data-model.md`'s `NamedOutcome` enumeration.
       **NOT superseded** (006 T020, 2026-09-14): no 005 harness case forces or asserts the
       named-outcome vocabulary end-to-end (checked — zero hits for `namedOutcome`/`NamedOutcome`
-      under `tests/harness/`). This still needs a human session run; candidate for a future 005/006
-      follow-up case, out of scope here per FR-004 (no fix without a failing case).
+      under `tests/harness/`). Flagged as a future 005/006 follow-up case, out of scope there per
+      FR-004 (no fix without a failing case). **RESOLVED 2026-09-21** by 006 T024 (`e3f5217`):
+      `deriveNamedOutcome` extracted as a hoisted pure helper in `fit-screen.js`
+      (`score.insufficient-input` / `open.unresolved` / `state.ambiguous-match`,
+      `config.evidence-unavailable` already covered separately by `config-gate.test.mjs` since it's
+      a run-start gate, not a per-record derivation), mirrored + tested in
+      `tests/harness/pure.test.mjs` (`deriveNamedOutcome uses exactly the fixed vocabulary, in
+      precedence order`) — asserts all four vocabulary values, the precedence order, and the
+      clean-record `null` case. Confirmed green: `npm run harness` reports 66/66 pass, 0
+      unexpected-red. This closes the vocabulary end-to-end structurally; no separate human session
+      run needed for this task.
 
 **Checkpoint**: All four stories functional end-to-end as one workflow run
 

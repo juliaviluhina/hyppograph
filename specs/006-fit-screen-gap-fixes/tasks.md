@@ -245,12 +245,13 @@ with evidence links; each of T025/T033/T038/T044 is checked or annotated
       order matching the original ternary, the clean-record `null` case, and that every value is a
       member of data-model.md's exact `NamedOutcome` enumeration (the fourth value,
       `config.evidence-unavailable`, stays covered by `config-gate.test.mjs` as before — it's a
-      run-start gate, not a per-record derivation, so it never reaches `deriveNamedOutcome`). NOT
-      run against `node --test` in this session — no Node runtime was available in this sandbox;
-      verified by textual sync-check (workflow/pure.mjs functions are byte-identical) and manual
-      logic review instead. **Run `npm run harness` to confirm green before merging.** On green,
-      check off 004's T044 in `specs/004-retrieval-fit-screen-rework/tasks.md` citing this test
-      name (same convention T020 used for T025/T033/T038).
+      run-start gate, not a per-record derivation, so it never reaches `deriveNamedOutcome`).
+      **CONFIRMED GREEN 2026-09-21**: Node was installed on the dev machine via Homebrew
+      (`brew install node`, v26.9.0 — it wasn't present at all before), and `npm run harness`
+      reports 66/66 pass, 0 blocked, 0 expected-red, 0 unexpected-red, including the new
+      sync-check and `deriveNamedOutcome` tests. 004's T044 checked off in
+      `specs/004-retrieval-fit-screen-rework/tasks.md` citing this test name (same convention T020
+      used for T025/T033/T038).
 
 **Checkpoint**: 004 formally closes; 006 spec's SC-001–SC-005 all satisfied.
 
