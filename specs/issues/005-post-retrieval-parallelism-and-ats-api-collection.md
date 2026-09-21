@@ -214,6 +214,19 @@ order, instead of not doing it at all.
   field-extraction calls are actually safe/reliable at the fast tier under load — the code comment's
   "drops or misroutes writes" claim may or may not extend to read-only judgment calls; test before
   assuming `pipeline()` is a drop-in replacement for the triage/normalize `for` loops.
+  **First pass done, 2026-09-20** — a minimal scratch probe (`Workflow` tool, 4 synthetic Raw
+  Record fixtures, 4 concurrent `hyppo-readwrite` write-triage calls via `parallel()` at FAST tier)
+  came back clean: every file got only its own `decision`/`reason`/`confidence`/`criteriaHash`, no
+  cross-contamination, no lost/duplicated/misrouted files, bodies byte-for-byte unchanged. **Not
+  sufficient to conclude "safe" yet** — n=4 with fake placeholder hash strings only tests the write
+  path, not real idempotency semantics. **Planned follow-up** (not yet run): scale to n=8-10
+  fixtures, and use the *real* `stableHash`/`criteriaFingerprint` from
+  `.claude/workflows/lib/intake-core.mjs` (not placeholder strings) to compute each record's
+  `criteriaHash`, so a second pass can verify — in pure code, no further model calls — that every
+  concurrently-written record's stored hash still matches a freshly recomputed one (the exact skip
+  condition `intake-normalize.js` uses, `rec.triage.criteriaHash === thisHash`). That closes the
+  loop between this concurrency check and 006's already-verified serial idempotency result, at
+  closer-to-real concurrency (near the `min(16, CPUs-2)` cap) instead of n=4.
 - Check each of Greenhouse/Lever/Ashby's actual public board-listing API shape (pagination limits,
   full-content availability, any rate limiting) against a real board before designing the
   WebFetch-based collect path.
