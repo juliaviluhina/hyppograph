@@ -228,6 +228,21 @@ with evidence links; each of T025/T033/T038/T044 is checked or annotated
       in `specs/004-retrieval-fit-screen-rework/tasks.md` with evidence links to the harness report
       and T018's smoke-run numbers. Depends on: T018, T020.
 
+- [ ] T024 [US3] New harness case for 004 T044 (named-outcome vocabulary, SC-010) — the one
+      manual-validation task T020 confirmed NOT superseded by any existing 005 case (zero
+      `namedOutcome`/`NamedOutcome` hits under `tests/harness/`). Add
+      `tests/harness/worker-cases/named-outcome-vocabulary.test.mjs` following the T014–T019
+      convention: force each of the four `NamedOutcome` values in turn against a scratch data
+      dir — missing/empty evidence file (`config.evidence-unavailable`), a Job Record missing
+      role title/requirements/company (`score.insufficient-input`), an `unresolvable` open-status
+      mark carried into scoring (`open.unresolved`), and a conflicting applications-tracker match
+      (`state.ambiguous-match`) — and assert the run summary's `namedOutcomeCounts` and the
+      provenance-log lines use exactly that vocabulary string, with a grep-style assertion that no
+      other free-text outcome name appears anywhere in either output. On green, check off 004's
+      T044 in `specs/004-retrieval-fit-screen-rework/tasks.md` citing this case's name (same
+      convention T020 used for T025/T033/T038). Depends on: T020 (confirms the gap), independent
+      of T018/T021.
+
 **Checkpoint**: 004 formally closes; 006 spec's SC-001–SC-005 all satisfied.
 
 ---

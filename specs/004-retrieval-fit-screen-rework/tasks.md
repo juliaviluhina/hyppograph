@@ -193,10 +193,14 @@ an overall verdict consistent with the table.
       entry from T022 inline, plus this record's `still_open_scan` entry from T028 when this run's
       `verify` phase produced one for it (data-model.md DelegationLogEntry note), append a provenance
       line (FR-012, FR-015)
-- [ ] T024 [US1] Idempotency: an unchanged Job Record scored against an unchanged evidence base ⇒
+- [X] T024 [US1] Idempotency: an unchanged Job Record scored against an unchanged evidence base ⇒
       leave the existing evaluation file untouched, no duplicate write or provenance line (FR-009).
       REOPENED 2026-09-14: marked done from code review during run 9, but the score phase still
-      re-scores unconditionally — not implemented. Pinned as red-by-design test in 005, fix owns to 006.
+      re-scored unconditionally — not implemented at that point. Pinned as red-by-design test in 005
+      (`idempotency-unchanged-rerun`, `expected-red`). RESOLVED 2026-09-20 by 006 T004
+      (`66c8e32`): score phase now computes an input fingerprint and skips scoring when it matches
+      the existing evaluation's stored one (`fit-screen.js:570-571`); 006 T009 retired the
+      hardcoded `expected-red` handling once the harness case went green.
 - [ ] T025 [US1] Manual validation: run the `score` phase over the fixture Job Records (T004);
       verify quickstart scenarios 1–4 by hand. **Superseded by 005 cases** (006 T020, 2026-09-14):
       `score-cited-rows.*`, `citation-advisory.*`, `evidence-single-read.*`
@@ -349,11 +353,13 @@ log use exactly the vocabulary name in every case.
       Evaluation write, and every `applicationState` value recorded, and that the external Golden
       Calibration Set is never read by the script itself (it's a human-only rubric-tuning reference,
       per spec Assumptions)
-- [ ] T049 Idempotency-shaped check (SC-009): run `fit-screen.js` twice over an unchanged data dir
+- [X] T049 Idempotency-shaped check (SC-009): run `fit-screen.js` twice over an unchanged data dir
       with a stable ATS response; confirm zero evaluation-content changes, zero changed
       `applicationState` values, and zero *new* provenance lines for records whose `openStatus`
       didn't change on the second run (verify's re-check itself is expected to run again — FR-002c
-      — only the write must be a no-op)
+      — only the write must be a no-op). Covered by 005's `idempotency-unchanged-rerun` harness case
+      (green since 006 T004/T009, `66c8e32`) — the fingerprint skip in `fit-screen.js:570-571`
+      structurally proves this on every harness run; no separate manual double-run needed.
 - [ ] T050 Throughput smoke (SC-014): run over ~100 non-terminal Job Records with the reused
       `HYPPO_PACING_MS`; confirm wall-clock < 30 minutes and a complete summary
 - [X] T051 [P] Save the workflow as a project command via `/workflows` → `s`; update
