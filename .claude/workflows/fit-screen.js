@@ -622,6 +622,15 @@ await pipeline(scorable, async (rec) => {
     );
   }
 
+  // issue 004 remediation — compFloor is code-computed (evaluateCompFloor), never hyppo-score's
+  // judgment; drop any row it returned anyway and splice in the deterministic one.
+  if (!insufficientInput) {
+    evalResult.hardConstraints = [
+      evaluateCompFloor(rec.salaryAmountOrRange, rec.salaryCurrency, settings.hardConstraints.compFloor),
+      ...evalResult.hardConstraints.filter((c) => c.constraint !== "compFloor"),
+    ];
+  }
+
   // R3 — no tracker file at all is never trusted to the model; forced deterministically in code.
   if (!applications.exists) {
     evalResult.applicationState = "unknown";
@@ -929,6 +938,75 @@ function mapSignalToMark(signal) {
   return "unresolvable"; // http_error | unparseable
 }
 
+// issue 004 remediation / data-model.md compFloor note — "a posted range clears only at/above
+// its midpoint reaching this floor" was documented but never enforced deterministically; it was
+// left to hyppo-score's own judgment alongside the rest of hardConstraints. Pure arithmetic once
+// the posted range is parsed to numbers belongs in code (Principle I), not a model call.
+// Returns null when the text has no comparable annual figure (verbatim-text field, never a
+// structured range — intake-normalize.js keeps salaryAmountOrRange as-stated on purpose).
+function parseSalaryRange(text) {
+  if (!text) return null;
+  const trimmed = String(text).trim();
+  if (trimmed === "" || trimmed.toLowerCase() === "unknown") return null;
+  if (/\b(hourly|hour|\/\s*hr)\b/i.test(trimmed)) return { hourly: true };
+  const numbers = [];
+  const numRe = /(\d[\d,]*(?:\.\d+)?)\s*(k\b)?/gi;
+  let m;
+  while ((m = numRe.exec(trimmed)) !== null) {
+    let n = parseFloat(m[1].replace(/,/g, ""));
+    if (Number.isNaN(n)) continue;
+    if (m[2]) n *= 1000; // "k" suffix, e.g. "90k-120k"
+    numbers.push(n);
+  }
+  if (numbers.length === 0) return null;
+  if (numbers.length === 1) return { low: numbers[0], high: numbers[0] };
+  return { low: numbers[0], high: numbers[1] };
+}
+
+// issue 004 remediation — code-owned compFloor verdict, replacing the model judgment. Unresolved
+// (never assumed pass/fail) whenever the posted text isn't a comparable annual figure in the
+// configured currency; likelyOutcome "even" there per research.md R11 (no better-than-a-coin-flip
+// read available from an unparseable/incomparable figure).
+function evaluateCompFloor(salaryAmountOrRange, salaryCurrency, compFloor) {
+  if (!compFloor) return { constraint: "compFloor", state: "pass", likelyOutcome: null, note: null };
+
+  if (salaryCurrency && salaryCurrency.toLowerCase() !== "unknown" && salaryCurrency !== compFloor.currency) {
+    return {
+      constraint: "compFloor",
+      state: "unresolved",
+      likelyOutcome: "even",
+      note: `posting currency ${salaryCurrency} differs from configured floor currency ${compFloor.currency}; no conversion performed`,
+    };
+  }
+
+  const parsed = parseSalaryRange(salaryAmountOrRange);
+  if (!parsed) {
+    return {
+      constraint: "compFloor",
+      state: "unresolved",
+      likelyOutcome: "even",
+      note: "posting's salary text did not resolve to a comparable annual figure",
+    };
+  }
+  if (parsed.hourly) {
+    return {
+      constraint: "compFloor",
+      state: "unresolved",
+      likelyOutcome: "even",
+      note: "posting states an hourly rate; no hourly comp floor is configured to compare against",
+    };
+  }
+
+  const midpoint = (parsed.low + parsed.high) / 2;
+  const pass = midpoint >= compFloor.amount;
+  return {
+    constraint: "compFloor",
+    state: pass ? "pass" : "fail",
+    likelyOutcome: null,
+    note: `midpoint ${midpoint} ${pass ? ">=" : "<"} floor ${compFloor.amount}`,
+  };
+}
+
 // T041 — a kept, verified Job Record too sparse to score meaningfully: missing role title,
 // requirements, or company. A deterministic code check (not the completeness:"low" flag alone, per
 // contracts/job-record-amendments.md) keeps this decision auditable and code-owned (Principle I).
@@ -1099,7 +1177,8 @@ function buildScorePrompt({ rec, evidenceText, evidenceFiles, hardConstraints, h
     "pass. For every `unresolved` row also set likelyOutcome (likely-pass/likely-fail/even) — your own",
     "best-effort read of whether the constraint is more likely than not to fail (research.md R11); for",
     "pass/fail rows, leave likelyOutcome null.",
-    `  - compFloor: ${JSON.stringify(hardConstraints.compFloor)} (null = no floor configured = pass)`,
+    "  - compFloor: DO NOT score this — the orchestrator computes it deterministically from the",
+    "    posted salary text. Omit it from your hardConstraints array entirely.",
     `  - location: excludedLocations = ${JSON.stringify(hardStops.excludedLocations)}`,
     `  - clearance: lackedClearances = ${JSON.stringify(hardStops.lackedClearances)} (fail only if the`,
     "    posting's text clearly REQUIRES one of these)",

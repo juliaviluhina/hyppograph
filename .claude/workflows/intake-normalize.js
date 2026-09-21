@@ -73,63 +73,22 @@ const FAST = "haiku"; // Principle II — the only tier this feature uses (T011 
  * agent() JSON schemas (T007) — documented in contracts/schemas.md
  * ------------------------------------------------------------------ */
 
-// Used by the run-precondition bootstrap: read inputs/settings.json and return only what 001 consumes.
-const settingsReadSchema = {
+// Run precondition: read inputs/settings.json's RAW TEXT — the script parses the JSON and extracts
+// every field itself. An earlier version of this schema asked a fast-tier agent to *transcribe*
+// trackedBoards/hardStops/directions into a matching shape; that transcription isn't guaranteed
+// byte-stable across runs (key order, whitespace, unicode normalization can all drift), which
+// silently defeated criteriaFingerprint()'s idempotency check — two runs over unchanged config
+// hashed to different values and every Raw Record got re-triaged (issue 006). Mirrors the identical
+// fix already applied in fit-screen.js's own settings read (see that file's rawFileReadSchema note):
+// the agent does ONLY a raw file read, no interpretation; JSON.parse() and all field extraction
+// happen in code (Principle I — "plain code owns config parsing").
+const rawFileReadSchema = {
   type: "object",
   additionalProperties: false,
-  required: ["found", "setupReady", "unresolved", "trackedBoards", "hardStops", "directions"],
+  required: ["found", "content"],
   properties: {
-    found: { type: "boolean" },
-    setupReady: { type: "boolean" },
-    unresolved: {
-      type: "array",
-      items: {
-        type: "object",
-        additionalProperties: false,
-        required: ["section", "reason"],
-        properties: { section: { type: "string" }, reason: { type: "string" } },
-      },
-    },
-    trackedBoards: {
-      type: "array",
-      items: {
-        type: "object",
-        additionalProperties: false,
-        required: ["name", "filteredSearch", "depth"],
-        properties: {
-          name: { type: "string" },
-          filteredSearch: { type: "string" },
-          depth: { type: ["integer", "number"] },
-        },
-      },
-    },
-    hardStops: {
-      type: "object",
-      additionalProperties: false,
-      required: [
-        "excludedLocations",
-        "lackedClearances",
-        "lackedWorkAuth",
-        "visaSponsorshipRequired",
-      ],
-      properties: {
-        excludedLocations: { type: "array", items: { type: "string" } },
-        lackedClearances: { type: "array", items: { type: "string" } },
-        lackedWorkAuth: { type: "array", items: { type: "string" } },
-        visaSponsorshipRequired: { type: "boolean" },
-      },
-    },
-    // sections.locations.value.excluded — unioned into the effective excluded-location set
-    locationsExcluded: { type: "array", items: { type: "string" } },
-    directions: {
-      type: "array",
-      items: {
-        type: "object",
-        additionalProperties: false,
-        required: ["name", "description"],
-        properties: { name: { type: "string" }, description: { type: "string" } },
-      },
-    },
+    found: { type: "boolean" }, // false => missing or unreadable
+    content: { type: "string" }, // "" when not found; the file's exact, unmodified text otherwise
   },
 };
 
@@ -263,32 +222,54 @@ const DEFAULT_DEPTH = args.defaultDepth ?? 25;
 log("intake-normalize starting", { run: RUN, dataDir: DATA, pacingMs: PACING_MS, fetchCap: FETCH_CAP });
 
 const summary = newRunSummary(RUN);
+// Provenance lines queued in memory and flushed with ONE agent() write per phase (see
+// flushProvenance below) instead of one agent() call per line — the previous per-record
+// read-modify-write of the single shared provenance-log.md was both the shared-file race
+// justification for keeping collect/triage/normalize serial (issue 006 note above) and a large
+// share of each phase's wall-clock cost (issue 005 §1).
+const provenanceQueue = [];
 
-/* ---- Run precondition (FR-000): load inputs/settings.json ---- */
-const settings = await agent(
-  [
-    "Read the JSON file at this exact path and return ONLY the requested fields:",
-    `  ${DATA}/inputs/settings.json`,
-    "",
-    "If the file is missing or unreadable: found=false, setupReady=false, unresolved=[], and empty",
-    "arrays/objects for the rest.",
-    "If it parses: set found=true; copy completeness.setupReady -> setupReady and",
-    "completeness.unresolved -> unresolved; copy sections.trackedBoards.value -> trackedBoards",
-    "(each {name, filteredSearch, depth}); sections.hardStops.value -> hardStops; ",
-    "sections.locations.value.excluded -> locationsExcluded; sections.directions.value -> directions",
-    "(each {name, description} — ignore materialsPath). Do not infer or fill missing values; if a",
-    "section is unset, use an empty array/object and the documented defaults for hardStops",
-    "(all lists [], visaSponsorshipRequired false).",
-  ].join("\n"),
-  { schema: settingsReadSchema, label: "read-settings", model: FAST, agentType: "hyppo-read" }
+/* ---- Run precondition (FR-000): load inputs/settings.json — RAW, then parsed in code ---- */
+const settingsFile = await agent(
+  [`Read this exact file and return its full, unmodified text content:`, `  ${DATA}/inputs/settings.json`].join(
+    "\n"
+  ),
+  { schema: rawFileReadSchema, label: "read-settings", model: FAST, agentType: "hyppo-read" }
 );
 
-if (!settings.found) {
+if (!settingsFile.found) {
   log("settings not found — run onboarding (feature 002). Exiting with zero writes.", {
     path: `${DATA}/inputs/settings.json`,
   });
   return { ok: false, reason: "settings-not-found", summary };
 }
+
+let settingsJson;
+try {
+  settingsJson = JSON.parse(settingsFile.content);
+} catch (err) {
+  log("settings.json does not parse as JSON — exiting with zero writes.", { error: String(err) });
+  return { ok: false, reason: "settings-not-found", summary };
+}
+
+// Every structured value below is extracted by CODE, never by asking a model to transcribe it
+// (see rawFileReadSchema's note). Same fields/defaults the earlier agent-transcribed version used,
+// now applied deterministically.
+const sec = settingsJson.sections || {};
+const settings = {
+  setupReady: (settingsJson.completeness || {}).setupReady === true,
+  unresolved: (settingsJson.completeness || {}).unresolved || [],
+  trackedBoards: (sec.trackedBoards || {}).value || [],
+  hardStops: {
+    excludedLocations: ((sec.hardStops || {}).value || {}).excludedLocations || [],
+    lackedClearances: ((sec.hardStops || {}).value || {}).lackedClearances || [],
+    lackedWorkAuth: ((sec.hardStops || {}).value || {}).lackedWorkAuth || [],
+    visaSponsorshipRequired: ((sec.hardStops || {}).value || {}).visaSponsorshipRequired === true,
+  },
+  locationsExcluded: ((sec.locations || {}).value || {}).excluded || [],
+  directions: ((sec.directions || {}).value || []).map((d) => ({ name: d.name, description: d.description })),
+};
+
 if (settings.setupReady !== true) {
   log("setup not ready — unresolved required sections. Exiting with zero writes (FR-000).", {
     unresolved: settings.unresolved,
@@ -417,7 +398,7 @@ phase("collect");
         summary.postingsCollected++;
         if (res.written) {
           summary.newRawRecords++;
-          await appendProvenance(DATA, RUN, "collect", {
+          queueProvenance(provenanceQueue, RUN, {
             what: res.rawRecordPath,
             how: "mcp-page-read",
             why: `collected from ${JSON.stringify(src.name)} (depth ${i + 1}/${src.depth})` +
@@ -495,7 +476,7 @@ phase("collect");
     summary.postingsCollected++;
     if (w.isNew) {
       summary.newRawRecords++;
-      await appendProvenance(DATA, RUN, "collect", {
+      queueProvenance(provenanceQueue, RUN, {
         what: w.rawRecordPath,
         how: "manual",
         why: `ingested from manual drop ${JSON.stringify(w.sourceRef)}`,
@@ -505,6 +486,8 @@ phase("collect");
   for (const sk of manual.skipped || []) {
     summary.itemsSkipped.push({ ref: sk.ref, reason: sk.reason }); // FR-003
   }
+
+  await flushProvenance(DATA, "collect", provenanceQueue);
 
   log("collect complete", {
     postingsCollected: summary.postingsCollected,
@@ -569,11 +552,14 @@ const rawRecords = (rawIndex.records || []).map((r) => ({
   path: `${RAW_DIR_REL}/${String(r.path || "").split("/").pop()}`,
 }));
 
-// Serial `for` loop, not pipeline(): every record's write-triage AND its appendProvenance run as
-// FAST hyppo-readwrite agents, and appendProvenance does a read-modify-write of the SINGLE shared
-// provenance-log.md. Run concurrently they lose updates (dropped provenance lines) and the FAST
-// writer drops or misroutes front-matter writes under load. collect + normalize are serial for the
-// same class of reason. Pacing in Phase A is serial agent latency anyway (see sleep() note at EOF).
+// Serial `for` loop, not pipeline(): every record's write-triage is a FAST hyppo-readwrite agent
+// call, and the FAST writer drops or misroutes front-matter writes under load when run concurrently
+// (unverified claim — see issue 005 TODO 2 item 1, a controlled concurrency test is still owed).
+// Provenance itself no longer forces seriality: queueProvenance()/flushProvenance() batch every
+// line into one end-of-phase write instead of one read-modify-write per record (issue 005 §1),
+// which also removed the wasted-cost multiplier issue 006 used to compound. collect + normalize are
+// serial for the same front-matter-write-safety reason. Pacing in Phase A is serial agent latency
+// anyway (see sleep() note at EOF).
 for (const rec of rawRecords) {
   const thisHash = stableHash(critFingerprint + "\u0000" + (rec.body || ""));
 
@@ -641,12 +627,14 @@ for (const rec of rawRecords) {
     summary.triageRejected++;
     bumpReason(summary, mark.reason);
   }
-  await appendProvenance(DATA, RUN, "triage", {
+  queueProvenance(provenanceQueue, RUN, {
     what: rec.path,
     how: "pre-triage",
     why: `${mark.decision} — ${mark.reason}` + (mark.confidence === "low" ? " (low confidence)" : ""),
   });
 }
+
+await flushProvenance(DATA, "triage", provenanceQueue);
 
 log("triage complete", {
   kept: summary.triageKept,
@@ -816,20 +804,22 @@ phase("normalize");
 
       if (result.created) {
         summary.newJobRecords++;
-        await appendProvenance(DATA, RUN, "normalize", {
+        queueProvenance(provenanceQueue, RUN, {
           what: result.path,
           how: "normalize",
           why: `created from ${rec.path}` + (result.alreadyApplied ? " (already applied)" : ""),
         });
       } else if (result.merged) {
         summary.duplicatesMerged++;
-        await appendProvenance(DATA, RUN, "normalize", {
+        queueProvenance(provenanceQueue, RUN, {
           what: result.path,
           how: "normalize",
           why: `merged source ${rec.path} into existing record`,
         });
       }
     }
+
+    await flushProvenance(DATA, "normalize", provenanceQueue);
 
     log("normalize complete", {
       newJobRecords: summary.newJobRecords,
@@ -1177,16 +1167,27 @@ function sourceListPrompt({ filteredSearch, depth }) {
 }
 /* END inlined:prompts */
 
-/* appendProvenance — one line, append-only, to provenance-log.md (Principle V).
- * `phaseName` only steers the /workflows progress grouping. */
-async function appendProvenance(dataDir, run, phaseName, entry) {
-  const line = provenanceLine(run, entry);
+/* queueProvenance — pure: append one rendered line to the in-memory queue (Principle V's "one
+ * provenance line per write" still holds; only the flush to disk is now batched — see
+ * flushProvenance). */
+function queueProvenance(queue, run, entry) {
+  queue.push(provenanceLine(run, entry));
+}
+
+/* flushProvenance — ONE agent() write of every queued line for a phase, appended in order, then
+ * clears the queue. Replaces one agent() call per provenance line with one call per phase: removes
+ * both the read-modify-write race that justified serial collect/triage/normalize (see the loop
+ * comments above) and most of the per-record wall-clock cost (issue 005 §1). No-op when the queue
+ * is empty (e.g. a re-run where every record was skipped). */
+async function flushProvenance(dataDir, phaseName, queue) {
+  if (queue.length === 0) return;
+  const lines = queue.splice(0, queue.length);
   await agent(
     [
-      `APPEND exactly one line (create the file if missing) to:`,
+      `APPEND exactly these lines, in this order (create the file if missing), to:`,
       `  ${dataDir}/provenance-log.md`,
-      "Line to append (do not modify existing lines, do not add a trailing blank line):",
-      line,
+      "Do not modify existing lines, do not add a trailing blank line, do not reorder or merge them:",
+      ...lines,
     ].join("\n"),
     {
       schema: {

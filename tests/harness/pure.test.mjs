@@ -13,6 +13,8 @@ import {
   computeOverallVerdict,
   fnv1aHex,
   computeInputFingerprint,
+  parseSalaryRange,
+  evaluateCompFloor,
 } from "./support/pure.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -45,6 +47,8 @@ test("sync-check: pure.mjs mirrors fit-screen.js verbatim", () => {
     "computeOverallVerdict",
     "fnv1aHex",
     "computeInputFingerprint",
+    "parseSalaryRange",
+    "evaluateCompFloor",
   ]) {
     assert.equal(extractFunction(pure, name), extractFunction(workflow, name), `${name} diverged — fix fit-screen.js, then re-copy`);
   }
@@ -101,6 +105,50 @@ test("computeOverallVerdict follows FR-006/FR-004a (T021)", () => {
   assert.equal(computeOverallVerdict(strong2, [hc("unresolved", "likely-fail")]), "SKIP");
   assert.equal(computeOverallVerdict(strong2, [hc("unresolved", "even")]), "APPLY-AND-SEE");
   assert.equal(computeOverallVerdict(strong2, [hc("unresolved", "likely-pass")]), "APPLY-AND-SEE");
+});
+
+test("parseSalaryRange (issue 004): text -> comparable numbers, or null/hourly when it can't", () => {
+  assert.equal(parseSalaryRange(""), null);
+  assert.equal(parseSalaryRange("unknown"), null);
+  assert.equal(parseSalaryRange(null), null);
+  assert.deepEqual(parseSalaryRange("$90,000"), { low: 90000, high: 90000 });
+  assert.deepEqual(parseSalaryRange("$90,000 - $110,000"), { low: 90000, high: 110000 });
+  assert.deepEqual(parseSalaryRange("90k-120k"), { low: 90000, high: 120000 });
+  assert.deepEqual(parseSalaryRange("$45/hr"), { hourly: true });
+  assert.deepEqual(parseSalaryRange("Competitive hourly rate"), { hourly: true });
+  assert.equal(parseSalaryRange("Competitive"), null);
+});
+
+test("evaluateCompFloor (issue 004): midpoint-clears-a-low-floor rule, deterministic, never assumed pass", () => {
+  assert.deepEqual(evaluateCompFloor("120k", "USD", null), {
+    constraint: "compFloor",
+    state: "pass",
+    likelyOutcome: null,
+    note: null,
+  });
+
+  // low end below the floor, but midpoint clears it -> pass (data-model.md compFloor rule)
+  let r = evaluateCompFloor("$90,000 - $130,000", "USD", { amount: 100000, currency: "USD" });
+  assert.equal(r.state, "pass");
+  assert.equal(r.constraint, "compFloor");
+  assert.equal(r.likelyOutcome, null);
+
+  // midpoint below the floor -> fail
+  r = evaluateCompFloor("$80,000 - $90,000", "USD", { amount: 100000, currency: "USD" });
+  assert.equal(r.state, "fail");
+
+  // currency mismatch -> unresolved, never assumed pass/fail
+  r = evaluateCompFloor("$150,000", "EUR", { amount: 100000, currency: "USD" });
+  assert.equal(r.state, "unresolved");
+  assert.equal(r.likelyOutcome, "even");
+
+  // unparseable text -> unresolved
+  r = evaluateCompFloor("Competitive", "USD", { amount: 100000, currency: "USD" });
+  assert.equal(r.state, "unresolved");
+
+  // hourly rate vs an annual floor -> unresolved, not a false comparison
+  r = evaluateCompFloor("$60/hr", "USD", { amount: 100000, currency: "USD" });
+  assert.equal(r.state, "unresolved");
 });
 
 test("fnv1aHex is deterministic and 8 hex chars", () => {
