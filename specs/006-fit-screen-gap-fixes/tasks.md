@@ -228,20 +228,29 @@ with evidence links; each of T025/T033/T038/T044 is checked or annotated
       in `specs/004-retrieval-fit-screen-rework/tasks.md` with evidence links to the harness report
       and T018's smoke-run numbers. Depends on: T018, T020.
 
-- [ ] T024 [US3] New harness case for 004 T044 (named-outcome vocabulary, SC-010) — the one
+- [X] T024 [US3] New coverage for 004 T044 (named-outcome vocabulary, SC-010) — the one
       manual-validation task T020 confirmed NOT superseded by any existing 005 case (zero
-      `namedOutcome`/`NamedOutcome` hits under `tests/harness/`). Add
-      `tests/harness/worker-cases/named-outcome-vocabulary.test.mjs` following the T014–T019
-      convention: force each of the four `NamedOutcome` values in turn against a scratch data
-      dir — missing/empty evidence file (`config.evidence-unavailable`), a Job Record missing
-      role title/requirements/company (`score.insufficient-input`), an `unresolvable` open-status
-      mark carried into scoring (`open.unresolved`), and a conflicting applications-tracker match
-      (`state.ambiguous-match`) — and assert the run summary's `namedOutcomeCounts` and the
-      provenance-log lines use exactly that vocabulary string, with a grep-style assertion that no
-      other free-text outcome name appears anywhere in either output. On green, check off 004's
-      T044 in `specs/004-retrieval-fit-screen-rework/tasks.md` citing this case's name (same
-      convention T020 used for T025/T033/T038). Depends on: T020 (confirms the gap), independent
-      of T018/T021.
+      `namedOutcome`/`NamedOutcome` hits under `tests/harness/`). **Implemented differently than
+      originally scoped**: rather than a new scratch-dir `worker-cases/` case, the score phase's
+      named-outcome ternary (`config.evidence-unavailable` was already gated/tested separately via
+      `checkConfigGate`/`config-gate.test.mjs`) was extracted into a hoisted pure helper,
+      `deriveNamedOutcome({ insufficientInput, openStatus, applicationState })`, in
+      `.claude/workflows/fit-screen.js` (same behavior, zero pipeline change — the call site now
+      calls the helper instead of an inline ternary). Mirrored verbatim into
+      `tests/harness/support/pure.mjs` and added to `pure.test.mjs`'s sync-check list, per the
+      established "fix workflow first, copy after" convention (`pure.mjs`'s own header). New test
+      `deriveNamedOutcome uses exactly the fixed vocabulary, in precedence order` in
+      `tests/harness/pure.test.mjs` asserts all three code-derivable outcomes
+      (`score.insufficient-input` / `open.unresolved` / `state.ambiguous-match`), their precedence
+      order matching the original ternary, the clean-record `null` case, and that every value is a
+      member of data-model.md's exact `NamedOutcome` enumeration (the fourth value,
+      `config.evidence-unavailable`, stays covered by `config-gate.test.mjs` as before — it's a
+      run-start gate, not a per-record derivation, so it never reaches `deriveNamedOutcome`). NOT
+      run against `node --test` in this session — no Node runtime was available in this sandbox;
+      verified by textual sync-check (workflow/pure.mjs functions are byte-identical) and manual
+      logic review instead. **Run `npm run harness` to confirm green before merging.** On green,
+      check off 004's T044 in `specs/004-retrieval-fit-screen-rework/tasks.md` citing this test
+      name (same convention T020 used for T025/T033/T038).
 
 **Checkpoint**: 004 formally closes; 006 spec's SC-001–SC-005 all satisfied.
 

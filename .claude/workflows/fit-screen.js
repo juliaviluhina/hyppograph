@@ -641,13 +641,11 @@ await pipeline(scorable, async (rec) => {
     ? null
     : computeOverallVerdict(evalResult.requirementTable, evalResult.hardConstraints); // T021
 
-  const namedOutcome = insufficientInput
-    ? "score.insufficient-input"
-    : rec.openStatus === "unresolvable"
-    ? "open.unresolved"
-    : evalResult.applicationState === "ambiguous"
-    ? "state.ambiguous-match"
-    : null;
+  const namedOutcome = deriveNamedOutcome({
+    insufficientInput,
+    openStatus: rec.openStatus,
+    applicationState: evalResult.applicationState,
+  });
   if (namedOutcome) bumpNamedOutcome(summary, namedOutcome);
 
   // T022 — citation_audit: once this batch has persisted 2+ evaluations, audit every non-`Unknown`
@@ -1017,6 +1015,16 @@ function isInsufficientInput(rec) {
     rec.requirements.length === 0 ||
     (rec.requirements.length === 1 && missing(rec.requirements[0]));
   return missing(rec.roleTitle) || missing(rec.canonicalCompany) || noRequirements;
+}
+
+// FR-008/data-model.md NamedOutcome — the fixed vocabulary this feature's non-clean conditions use,
+// in the same priority order as the call site: insufficient input trumps an unresolvable open-status
+// flag, which trumps an ambiguous application-tracker match. A clean record gets null (no outcome).
+function deriveNamedOutcome({ insufficientInput, openStatus, applicationState }) {
+  if (insufficientInput) return "score.insufficient-input";
+  if (openStatus === "unresolvable") return "open.unresolved";
+  if (applicationState === "ambiguous") return "state.ambiguous-match";
+  return null;
 }
 
 // T021/FR-006/FR-004a — the script alone computes the final verdict; hyppo-score's output is never

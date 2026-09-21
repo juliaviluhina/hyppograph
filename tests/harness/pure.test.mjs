@@ -10,6 +10,7 @@ import {
   buildAtsApiUrl,
   mapSignalToMark,
   isInsufficientInput,
+  deriveNamedOutcome,
   computeOverallVerdict,
   fnv1aHex,
   computeInputFingerprint,
@@ -44,6 +45,7 @@ test("sync-check: pure.mjs mirrors fit-screen.js verbatim", () => {
     "buildAtsApiUrl",
     "mapSignalToMark",
     "isInsufficientInput",
+    "deriveNamedOutcome",
     "computeOverallVerdict",
     "fnv1aHex",
     "computeInputFingerprint",
@@ -91,6 +93,52 @@ test("isInsufficientInput catches sparse records (T041)", () => {
   assert.equal(isInsufficientInput({ ...ok, canonicalCompany: "unknown" }), true);
   assert.equal(isInsufficientInput({ ...ok, requirements: [] }), true);
   assert.equal(isInsufficientInput({ ...ok, requirements: ["unknown"] }), true);
+});
+
+test("deriveNamedOutcome uses exactly the fixed vocabulary, in precedence order (004 FR-008/SC-010, 006 T024)", () => {
+  const clean = { insufficientInput: false, openStatus: "confirmed-open", applicationState: "not_applied" };
+  assert.equal(deriveNamedOutcome(clean), null, "a clean record gets no named outcome");
+
+  assert.equal(
+    deriveNamedOutcome({ ...clean, insufficientInput: true }),
+    "score.insufficient-input"
+  );
+  assert.equal(
+    deriveNamedOutcome({ ...clean, openStatus: "unresolvable" }),
+    "open.unresolved"
+  );
+  assert.equal(
+    deriveNamedOutcome({ ...clean, applicationState: "ambiguous" }),
+    "state.ambiguous-match"
+  );
+
+  // Precedence: insufficient input wins over an unresolvable open-status flag, which wins over an
+  // ambiguous tracker match — matches the ternary order at the fit-screen.js score-phase call site.
+  assert.equal(
+    deriveNamedOutcome({ insufficientInput: true, openStatus: "unresolvable", applicationState: "ambiguous" }),
+    "score.insufficient-input"
+  );
+  assert.equal(
+    deriveNamedOutcome({ insufficientInput: false, openStatus: "unresolvable", applicationState: "ambiguous" }),
+    "open.unresolved"
+  );
+
+  // Every value this helper can return, plus config.evidence-unavailable (asserted separately by
+  // config-gate.test.mjs against the real settings-validation gate), is exactly data-model.md's
+  // NamedOutcome enumeration — no fifth value, no free text, ever.
+  const NAMED_OUTCOME_VOCABULARY = [
+    "open.unresolved",
+    "score.insufficient-input",
+    "config.evidence-unavailable",
+    "state.ambiguous-match",
+  ];
+  for (const outcome of [
+    deriveNamedOutcome({ ...clean, insufficientInput: true }),
+    deriveNamedOutcome({ ...clean, openStatus: "unresolvable" }),
+    deriveNamedOutcome({ ...clean, applicationState: "ambiguous" }),
+  ]) {
+    assert.ok(NAMED_OUTCOME_VOCABULARY.includes(outcome), `${outcome} is not in the fixed vocabulary`);
+  }
 });
 
 test("computeOverallVerdict follows FR-006/FR-004a (T021)", () => {

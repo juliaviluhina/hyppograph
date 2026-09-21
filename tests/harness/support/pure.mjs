@@ -47,6 +47,13 @@ export function isInsufficientInput(rec) {
   return missing(rec.roleTitle) || missing(rec.canonicalCompany) || noRequirements;
 }
 
+export function deriveNamedOutcome({ insufficientInput, openStatus, applicationState }) {
+  if (insufficientInput) return "score.insufficient-input";
+  if (openStatus === "unresolvable") return "open.unresolved";
+  if (applicationState === "ambiguous") return "state.ambiguous-match";
+  return null;
+}
+
 // 006 T003/T007 — FNV-1a 32-bit over UTF-16 code units, hex, zero-padded to 8 chars.
 // contracts/eval-fingerprint.md — mirrored verbatim from .claude/workflows/fit-screen.js.
 export function fnv1aHex(str) {
