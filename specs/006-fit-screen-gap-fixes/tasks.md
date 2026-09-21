@@ -228,6 +228,31 @@ with evidence links; each of T025/T033/T038/T044 is checked or annotated
       in `specs/004-retrieval-fit-screen-rework/tasks.md` with evidence links to the harness report
       and T018's smoke-run numbers. Depends on: T018, T020.
 
+- [X] T024 [US3] New coverage for 004 T044 (named-outcome vocabulary, SC-010) — the one
+      manual-validation task T020 confirmed NOT superseded by any existing 005 case (zero
+      `namedOutcome`/`NamedOutcome` hits under `tests/harness/`). **Implemented differently than
+      originally scoped**: rather than a new scratch-dir `worker-cases/` case, the score phase's
+      named-outcome ternary (`config.evidence-unavailable` was already gated/tested separately via
+      `checkConfigGate`/`config-gate.test.mjs`) was extracted into a hoisted pure helper,
+      `deriveNamedOutcome({ insufficientInput, openStatus, applicationState })`, in
+      `.claude/workflows/fit-screen.js` (same behavior, zero pipeline change — the call site now
+      calls the helper instead of an inline ternary). Mirrored verbatim into
+      `tests/harness/support/pure.mjs` and added to `pure.test.mjs`'s sync-check list, per the
+      established "fix workflow first, copy after" convention (`pure.mjs`'s own header). New test
+      `deriveNamedOutcome uses exactly the fixed vocabulary, in precedence order` in
+      `tests/harness/pure.test.mjs` asserts all three code-derivable outcomes
+      (`score.insufficient-input` / `open.unresolved` / `state.ambiguous-match`), their precedence
+      order matching the original ternary, the clean-record `null` case, and that every value is a
+      member of data-model.md's exact `NamedOutcome` enumeration (the fourth value,
+      `config.evidence-unavailable`, stays covered by `config-gate.test.mjs` as before — it's a
+      run-start gate, not a per-record derivation, so it never reaches `deriveNamedOutcome`).
+      **CONFIRMED GREEN 2026-09-21**: Node was installed on the dev machine via Homebrew
+      (`brew install node`, v26.9.0 — it wasn't present at all before), and `npm run harness`
+      reports 66/66 pass, 0 blocked, 0 expected-red, 0 unexpected-red, including the new
+      sync-check and `deriveNamedOutcome` tests. 004's T044 checked off in
+      `specs/004-retrieval-fit-screen-rework/tasks.md` citing this test name (same convention T020
+      used for T025/T033/T038).
+
 **Checkpoint**: 004 formally closes; 006 spec's SC-001–SC-005 all satisfied.
 
 ---
