@@ -304,6 +304,11 @@ const FETCH_CAP = args.fetchCap ?? 300;
 // in the same category as PACING_MS/FETCH_CAP reuse — never consulted by any judgment,
 // verdict, mark, or persistence path.
 const ATS_API_BASE_OVERRIDES = args.atsApiBaseOverrides ?? {};
+// Post-006 finding (2026-09-21): appendProvenance() read+rewrote the ENTIRE provenance-log.md on
+// every single call — cost scales with file size × call count, and this pipeline called it once
+// per record per phase. Ported intake-normalize.js's issue-006 batching fix (queueProvenance/
+// flushProvenance below) instead of one agent() call per line — same pattern, same reason.
+const provenanceQueue = [];
 
 log("fit-screen starting", { run: RUN, dataDir: DATA, pacingMs: PACING_MS, fetchCap: FETCH_CAP });
 
@@ -520,7 +525,7 @@ phase("verify");
     );
 
     if (markChanged) {
-      await appendProvenance(DATA, RUN, "verify", {
+      queueProvenance(provenanceQueue, RUN, {
         what: rec.path,
         how: "still-open-check",
         why: `${rec.openStatus || "null"} -> ${newMark} (${newReason})`,
@@ -533,7 +538,7 @@ phase("verify");
     // Evaluation's delegations[] instead (T023) — never logged in both places.
     if (stillOpenScanEntry) {
       if (newMark === "confirmed-closed") {
-        await appendProvenance(DATA, RUN, "verify", {
+        queueProvenance(provenanceQueue, RUN, {
           what: rec.path,
           how: "still_open_scan delegation",
           why: `signal=${signal}, reviewStatus=accepted`,
@@ -549,6 +554,8 @@ phase("verify");
     else if (newMark === "confirmed-closed") summary.verifiedConfirmedClosed++;
     else summary.verifiedUnresolvable++;
   }
+
+  await flushProvenance(DATA, "verify", provenanceQueue);
 
   log("verify complete", {
     confirmedOpen: summary.verifiedConfirmedOpen,
@@ -779,7 +786,7 @@ await pipeline(scorable, async (rec) => {
     { schema: writtenAckSchema, label: `migrate-application-state:${rec.key}`, model: FAST, phase: "score", agentType: "hyppo-readwrite" }
   );
 
-  await appendProvenance(DATA, RUN, "score", {
+  queueProvenance(provenanceQueue, RUN, {
     what: `evaluations/${rec.key}.md`,
     how: "score",
     why: insufficientInput
@@ -792,6 +799,8 @@ await pipeline(scorable, async (rec) => {
   if (evalResult.hardConstraints.some((c) => c.state === "fail")) summary.hardConstraintFailures++;
   summary.applicationStateCounts[evalResult.applicationState]++;
 });
+
+await flushProvenance(DATA, "score", provenanceQueue);
 
 log("score complete", {
   scored: summary.scored,
@@ -855,14 +864,26 @@ function provenanceLine(run, { what, how, why }) {
   return `${run}  ${run}  ${what}  ${how}  ${why}`;
 }
 
-async function appendProvenance(dataDir, run, phaseName, entry) {
-  const line = provenanceLine(run, entry);
+/* queueProvenance — pure: append one rendered line to the in-memory queue (ported from
+ * intake-normalize.js's issue-006 batching fix, 2026-09-21). Only the flush to disk is batched. */
+function queueProvenance(queue, run, entry) {
+  queue.push(provenanceLine(run, entry));
+}
+
+/* flushProvenance — ONE agent() write of every queued line for a phase, appended in order, then
+ * clears the queue. Replaces one agent() call per provenance line (which each read+rewrote the
+ * ENTIRE growing provenance-log.md) with one call per phase — removes the dominant cost driver
+ * found in the 2026-09-21 live-run cost audit (~58% of total tokens). No-op when the queue is
+ * empty (e.g. an idempotent re-run where every record was skipped). */
+async function flushProvenance(dataDir, phaseName, queue) {
+  if (queue.length === 0) return;
+  const lines = queue.splice(0, queue.length);
   await agent(
     [
-      `APPEND exactly one line (create the file if missing) to:`,
+      `APPEND exactly these lines, in this order (create the file if missing), to:`,
       `  ${dataDir}/provenance-log.md`,
-      "Line to append (do not modify existing lines, do not add a trailing blank line):",
-      line,
+      "Do not modify existing lines, do not add a trailing blank line, do not reorder or merge them:",
+      ...lines,
     ].join("\n"),
     { schema: appendedAckSchema, label: "provenance", model: FAST, phase: phaseName, agentType: "hyppo-readwrite" }
   );
