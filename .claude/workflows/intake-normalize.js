@@ -218,6 +218,11 @@ const DATA = args.dataDir;
 const PACING_MS = args.pacingMs ?? 3000; // FR-006a
 const FETCH_CAP = args.fetchCap ?? 300; // FR-006a
 const DEFAULT_DEPTH = args.defaultDepth ?? 25;
+// Optional per-run cap on real (non-skipped) triage calls — same pattern as FETCH_CAP, added
+// 2026-09-21 to let a long re-triage pass (e.g. after a criteria change forces the whole backlog
+// through R6) be stopped and resumed mid-phase without re-paying for already-completed records.
+// Unset (default Infinity) preserves prior behavior exactly.
+const TRIAGE_CAP = args.triageCap ?? Infinity;
 
 log("intake-normalize starting", { run: RUN, dataDir: DATA, pacingMs: PACING_MS, fetchCap: FETCH_CAP });
 
@@ -560,6 +565,7 @@ const rawRecords = (rawIndex.records || []).map((r) => ({
 // which also removed the wasted-cost multiplier issue 006 used to compound. collect + normalize are
 // serial for the same front-matter-write-safety reason. Pacing in Phase A is serial agent latency
 // anyway (see sleep() note at EOF).
+let triaged = 0;
 for (const rec of rawRecords) {
   const thisHash = stableHash(critFingerprint + "\u0000" + (rec.body || ""));
 
@@ -570,6 +576,13 @@ for (const rec of rawRecords) {
     if (rec.triage.confidence === "low") summary.triageLowConfidence++;
     rec._decision = rec.triage.decision;
     continue;
+  }
+
+  if (triaged >= TRIAGE_CAP) {
+    log("per-run triage cap reached — leaving remaining records untriaged for a later run", {
+      cap: TRIAGE_CAP,
+    });
+    break;
   }
 
   let mark;
@@ -619,6 +632,7 @@ for (const rec of rawRecords) {
     }
   );
 
+  triaged++;
   rec._decision = mark.decision;
   if (mark.decision === "kept") {
     summary.triageKept++;
