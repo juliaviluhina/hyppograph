@@ -304,6 +304,13 @@ const FETCH_CAP = args.fetchCap ?? 300;
 // in the same category as PACING_MS/FETCH_CAP reuse — never consulted by any judgment,
 // verdict, mark, or persistence path.
 const ATS_API_BASE_OVERRIDES = args.atsApiBaseOverrides ?? {};
+// Optional allowlist of Job Record bare file names to run this pass over — added 2026-09-21 for
+// jev-based prefiltering (see fit-screen-prefilter skill): a cheap Jev pass over the full Job
+// Record set decides which ones are worth the real verify+score cost, then passes only those paths
+// here. Routing-only, same category as ATS_API_BASE_OVERRIDES — never consulted by any judgment,
+// verdict, mark, or persistence path. Omitted (default null) preserves prior behavior exactly: every
+// non-closed Job Record is scanned, same as before this arg existed.
+const RECORD_PATHS_ALLOWLIST = args.recordPaths ? new Set(args.recordPaths) : null;
 // Post-006 finding (2026-09-21): appendProvenance() read+rewrote the ENTIRE provenance-log.md on
 // every single call — cost scales with file size × call count, and this pipeline called it once
 // per record per phase. Ported intake-normalize.js's issue-006 batching fix (queueProvenance/
@@ -433,10 +440,20 @@ const index = await agent(
 );
 
 const RECORDS_DIR_REL = "outputs/job-records";
-const records = (index.records || []).map((r) => ({
+const allRecords = (index.records || []).map((r) => ({
   ...r,
   path: `${RECORDS_DIR_REL}/${String(r.path || "").split("/").pop()}`,
 }));
+const records = RECORD_PATHS_ALLOWLIST
+  ? allRecords.filter((r) => RECORD_PATHS_ALLOWLIST.has(r.path.split("/").pop()))
+  : allRecords;
+if (RECORD_PATHS_ALLOWLIST) {
+  log("recordPaths allowlist applied", {
+    totalIndexed: allRecords.length,
+    allowlisted: RECORD_PATHS_ALLOWLIST.size,
+    matched: records.length,
+  });
+}
 
 if (records.length === 0) {
   log("no Job Records to verify/score — nothing to do", {});
